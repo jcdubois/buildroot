@@ -15,6 +15,10 @@ config BR2_PACKAGE_LXC
 
 	  https://linuxcontainers.org/
 
+	  This only select the liblxc library (used for example with libvirt).
+	  You need to select other options bellow to also install the lxc-*
+	  binary utilities if you need them.
+
 comment "lxc needs a glibc or musl toolchain w/ threads, headers >= 3.0, dynamic library, gcc >= 4.7"
 	depends on BR2_USE_MMU
 	depends on !BR2_TOOLCHAIN_HAS_THREADS \
@@ -22,3 +26,20 @@ comment "lxc needs a glibc or musl toolchain w/ threads, headers >= 3.0, dynamic
 		|| !BR2_TOOLCHAIN_HEADERS_AT_LEAST_3_0 \
 		|| BR2_STATIC_LIBS \
 		|| BR2_TOOLCHAIN_USES_UCLIBC
+
+config BR2_PACKAGE_LXC_TOOLS
+    bool "install lxc tools (lxc-* commands)"
+    default y
+    depends on BR2_PACKAGE_LXC
+    help
+      Build and install the lxc-* utilities (lxc-create, lxc-start,
+      etc.). Disable this option if you only require the liblxc library
+      (for example to be used with libvirt utilities).
+
+config BR2_PACKAGE_LXC_TOOLS_MULTICALL
+    bool "use the 'lxc' multicall binary"
+    default y
+    depends on BR2_PACKAGE_LXC_TOOLS
+    help
+      Build the lxc tools as a unique lxc binary to which other lxc-*
+      commands point as symbolic links. This optimizes the package size.
