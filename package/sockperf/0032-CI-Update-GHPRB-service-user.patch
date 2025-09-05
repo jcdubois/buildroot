@@ -1,0 +1,51 @@
+From f12cc1b663385394a62d4438c8530955ac4083c0 Mon Sep 17 00:00:00 2001
+From: Michael Braverman <michaelbr@nvidia.com>
+Date: Sun, 6 Apr 2025 16:32:07 +0300
+Subject: [PATCH 32/33] [CI] Update GHPRB service user
+
+Shared user sometimes been abused by other teams causing GitHub token
+exhaustion
+This causes delays in GHPRB plug in response
+
+Move to media team dedicated service user
+
+Issue: HPCINFRA-3443
+
+Signed-off-by: Michael Braverman <michaelbr@nvidia.com>
+---
+ .ci/proj_jjb.yaml                 | 3 ++-
+ .ci/windows/windows_proj_jjb.yaml | 4 ++--
+ 2 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/.ci/proj_jjb.yaml b/.ci/proj_jjb.yaml
+index e92ea70..9b570a4 100644
+--- a/.ci/proj_jjb.yaml
++++ b/.ci/proj_jjb.yaml
+@@ -88,7 +88,8 @@
+             failure-status: "[FAIL]"
+             error-status:   "[FAIL]"
+             status-add-test-results: true
+-            auth-id: 'swx-jenkins5_gh_token'
++            # svc-nbu-swx-media from GitHub Pull Request Builder
++            auth-id: 'svc-nbu-swx-media_GHPRB_ID'
+             org-list: ["Mellanox"]
+             white-list: ["swx-jenkins","swx-jenkins2","swx-jenkins3","mellanox-github"]
+             allow-whitelist-orgs-as-admins: true
+diff --git a/.ci/windows/windows_proj_jjb.yaml b/.ci/windows/windows_proj_jjb.yaml
+index 218c257..45cb565 100644
+--- a/.ci/windows/windows_proj_jjb.yaml
++++ b/.ci/windows/windows_proj_jjb.yaml
+@@ -33,8 +33,8 @@
+             failure-status: "[FAIL]"
+             error-status:   "[FAIL]"
+             status-add-test-results: true
+-            # swx-jenkins5 from GitHub Pull Request Builder
+-            auth-id: 'swx-jenkins5_gh_token'
++            # svc-nbu-swx-media from GitHub Pull Request Builder
++            auth-id: 'svc-nbu-swx-media_GHPRB_ID'
+             org-list: ["Mellanox", "mellanox-hpc", "Mellanox-lab"]
+             allow-whitelist-orgs-as-admins: true
+             cancel-builds-on-update: true
+-- 
+2.43.0
+

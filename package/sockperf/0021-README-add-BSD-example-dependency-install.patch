@@ -1,0 +1,33 @@
+From ae0bd189955ce8394f6c905f1a9fb45d4b89c6f9 Mon Sep 17 00:00:00 2001
+From: mcgov <matthewgmcgovern@gmail.com>
+Date: Fri, 28 Jul 2023 13:06:53 -0700
+Subject: [PATCH 21/33] README: add BSD example dependency install
+
+Update README to include an example dependency install for FreeBSD.
+
+Accounts for some packaging details:
+- freebsd >= 10 ships with clang, g++ not required.
+- pkg install automake includes it's dependencies (including perl5 and m4)
+- make is either bmake or gmake, both seem to work with clang (cc on FreeBSD)
+---
+ README.md | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index 4fa01b3..ec18ab3 100644
+--- a/README.md
++++ b/README.md
+@@ -24,7 +24,9 @@ Specifically, in addition to the standard throughput tests, **sockperf** does th
+      * Clang
+      * icc
+ 
+-   `sudo apt install perl make automake autoconf m4 libtool-bin g++`
++   Linux (Debian/Ubuntu): `sudo apt install perl make automake autoconf m4 libtool-bin g++`
++   
++   FreeBSD: `sudo pkg install gmake automake libtool`
+ 
+ ## How to install
+ 
+-- 
+2.43.0
+

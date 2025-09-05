@@ -1,0 +1,127 @@
+From fc2afc9d987eb50397a399f9cac591a58305a8e4 Mon Sep 17 00:00:00 2001
+From: Wonsup Yoon <pusnow@kaist.ac.kr>
+Date: Thu, 23 Feb 2023 23:47:05 +0900
+Subject: [PATCH 07/33] Add command argument handling for kqueue
+
+---
+ src/client.cpp   |  6 ++++++
+ src/common.cpp   |  2 +-
+ src/defs.h       |  1 +
+ src/server.cpp   |  6 ++++++
+ src/sockperf.cpp | 13 +++++++++----
+ 5 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/src/client.cpp b/src/client.cpp
+index 765a3bd..96af2b7 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -1272,6 +1272,12 @@ void client_handler(handler_info *p_info) {
+             break;
+         }
+ #endif // !__FreeBSD__ && !defined(__APPLE__)
++#if defined(__FreeBSD__) || defined(__APPLE__)
++        case KQUEUE: {
++            client_handler<IoKqueue>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
++            break;
++        }
++#endif // defined(__FreeBSD__) || defined(__APPLE__)
+ #ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+         case SOCKETXTREME: {
+             client_handler<IoSocketxtreme>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+diff --git a/src/common.cpp b/src/common.cpp
+index babd39f..565c3cc 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -234,7 +234,7 @@ const char *handler2str(fd_block_handler_t type) {
+     static const char *s_fds_handle_desc[FD_HANDLE_MAX] = { "recvfrom", "recvfrom", "select"
+ #ifndef __windows__
+                                                             ,
+-                                                            "poll", "epoll",
++                                                            "poll", "epoll", "kqueue",
+ #ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+                                                             "socketxtreme"
+ #endif // USING_VMA_EXTRA_API
+diff --git a/src/defs.h b/src/defs.h
+index 8b37764..461468c 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -691,6 +691,7 @@ typedef enum { // must be coordinated with s_fds_handle_desc in common.cpp
+ #ifndef __windows__
+     POLL,
+     EPOLL,
++    KQUEUE,
+ #endif
+     SOCKETXTREME,
+     FD_HANDLE_MAX } fd_block_handler_t;
+diff --git a/src/server.cpp b/src/server.cpp
+index ec803a4..8bc377a 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -422,6 +422,12 @@ void server_handler(handler_info *p_info) {
+             break;
+         }
+ #endif // !defined(__FreeBSD__) && !defined(__APPLE__)
++#if defined(__FreeBSD__) || defined(__APPLE__)
++        case KQUEUE: {
++            server_handler<IoKqueue>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
++            break;
++        }
++#endif // defined(__FreeBSD__) || defined(__APPLE__)
+ #ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+         case SOCKETXTREME: {
+             server_handler<IoSocketxtreme>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 71c9e2c..e3639f3 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -191,7 +191,7 @@ static const AOPT_DESC common_opt_desc[] = {
+ #ifdef __windows__
+       "Type of multiple file descriptors handle [s|select|r|recvfrom](default select)."
+ #elif defined(__FreeBSD__) || defined(__APPLE__)
+-      "Type of multiple file descriptors handle [s|select|p|poll|r|recvfrom](default select)."
++      "Type of multiple file descriptors handle [s|select|p|poll|r|recvfrom|k|kqueue](default kqueue)."
+ #else
+       "Type of multiple file descriptors handle "
+       "[s|select|p|poll|e|epoll|r|recvfrom|x|socketxtreme](default epoll)."
+@@ -204,7 +204,7 @@ static const AOPT_DESC common_opt_desc[] = {
+ #ifdef __windows__
+       "Set select timeout to <msec>, -1 for infinite (default is 10 msec)."
+ #elif defined(__FreeBSD__) || defined(__APPLE__)
+-      "Set select/poll timeout to <msec>, -1 for infinite (default is 10 msec)."
++      "Set select/poll/kqueue timeout to <msec>, -1 for infinite (default is 10 msec)."
+ #else
+       "Set select/poll/epoll timeout to <msec>, -1 for infinite (default is 10 msec)."
+ #endif
+@@ -1820,7 +1820,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                     strncpy(feedfile_name, optarg, MAX_ARGV_SIZE);
+                     feedfile_name[MAX_PATH_LENGTH - 1] = '\0';
+ #if defined(__windows__) || defined(__FreeBSD__) || defined(__APPLE__)
+-                    s_user_params.fd_handler_type = SELECT;
++                    s_user_params.fd_handler_type = KQUEUE;
+ #else
+                     s_user_params.fd_handler_type = EPOLL;
+ #endif
+@@ -1847,6 +1847,11 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                     if (!strcmp(fd_handle_type, "epoll") || !strcmp(fd_handle_type, "e")) {
+                         s_user_params.fd_handler_type = EPOLL;
+                     } else
++#endif
++#if defined(__FreeBSD__) || defined(__APPLE__)
++                    if (!strcmp(fd_handle_type, "kqueue") || !strcmp(fd_handle_type, "k")) {
++                        s_user_params.fd_handler_type = KQUEUE;
++                    } else
+ #endif
+                         if (!strcmp(fd_handle_type, "poll") || !strcmp(fd_handle_type, "p")) {
+                         s_user_params.fd_handler_type = POLL;
+@@ -1966,7 +1971,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+ #ifdef __windows__
+                     log_msg("'-%d' Invalid select timeout val: %s", OPT_SELECT_TIMEOUT, optarg);
+ #elif defined(__FreeBSD__) || defined(__APPLE__)
+-                    log_msg("'-%d' Invalid select/poll timeout val: %s", OPT_SELECT_TIMEOUT,
++                    log_msg("'-%d' Invalid select/poll/kqueue timeout val: %s", OPT_SELECT_TIMEOUT,
+                             optarg);
+ #else
+                     log_msg("'-%d' Invalid select/poll/epoll timeout val: %s", OPT_SELECT_TIMEOUT,
+-- 
+2.43.0
+

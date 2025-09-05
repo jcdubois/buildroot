@@ -1,0 +1,1414 @@
+From c94aae6606fa5393d3d996426936c19c08e09514 Mon Sep 17 00:00:00 2001
+From: Alexander Grissik <agrissik@nvidia.com>
+Date: Tue, 30 May 2023 22:09:08 +0300
+Subject: [PATCH 13/33] issue: 3485633 Adding support for XLIO socketxtreme and
+ callback-api
+
+Signed-off-by: Alexander Grissik <agrissik@nvidia.com>
+---
+ doc/main.dox         |   8 +-
+ src/client.cpp       |  54 ++++++++---
+ src/client.h         |  48 +++++++---
+ src/common.cpp       |   4 +-
+ src/defs.cpp         |   5 -
+ src/defs.h           |  48 ++++++----
+ src/input_handlers.h | 141 +++++++++++++++++++++-------
+ src/iohandlers.cpp   |  59 +-----------
+ src/iohandlers.h     | 218 +++++++++++++++++++++++++++++++++----------
+ src/server.cpp       |  66 ++++++-------
+ src/server.h         |  72 +++++++++++---
+ src/sockperf.cpp     | 123 ++++++++++++++----------
+ 12 files changed, 548 insertions(+), 298 deletions(-)
+
+diff --git a/doc/main.dox b/doc/main.dox
+index 304ae87..84f8503 100644
+--- a/doc/main.dox
++++ b/doc/main.dox
+@@ -144,8 +144,8 @@ sockperf: [tid 4805] using epoll() to block on socket(s)
+          --recv_looping_num     -Set sockperf to loop over recvfrom() until EAGAIN or <N> good received packets, -1 for infinite, must be used with --nonblocked (default 1).
+          --dontwarmup           -Don't send warm up messages on start.
+          --pre-warmup-wait      -Time to wait before sending warm up messages (seconds).
+-         --zcopyread,--vmazcopyread
+-                                -Use VMA's zero copy reads API (See VMA's readme).
++         --zcopyread
++                                -Use zero copy reads API (See VMA/XLIO readme).
+          --daemonize            -Run as daemon.
+          --no-rdtsc             -Don't use register when taking time; instead use monotonic clock.
+          --load-vma             -Load VMA dynamically even when LD_PRELOAD was not used.
+@@ -161,8 +161,8 @@ sockperf: [tid 4805] using epoll() to block on socket(s)
+ @code
+          --threads-num          -Run <N> threads on server side (requires '-f' option).
+          --cpu-affinity         -Set threads affinity to the given core ids in list format (see: cat /proc/cpuinfo).
+-         --rxfiltercb,--vmarxfiltercb
+-                                -Use VMA's receive path message filter callback API (See VMA's readme).
++         --rxfiltercb
++                                -Use receive path message filter callback API (See VMA/XLIO readme).
+          --force-unicast-reply  -Force server to reply via unicast.
+          --dont-reply           -Server won't reply to the client messages.
+  -m      --msg-size             -Set maximum message size that the server can receive <size> bytes (default 65507).
+diff --git a/src/client.cpp b/src/client.cpp
+index 364de16..98651fe 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -793,28 +793,45 @@ void Client<IoType, SwitchDataIntegrity, SwitchActivityInfo, SwitchCycleDuration
+ }
+ 
+ //------------------------------------------------------------------------------
+-#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+-static int _connect_check_vma(int ifd) {
++#ifdef USING_EXTRA_API // For socketxtreme Only
++template <class API, class C>
++static int _connect_check_socketxtreme_api(int ifd, API extra_api) {
+     int rc = SOCKPERF_ERR_SOCKET;
+     int ring_fd = 0;
+     int poll = 0;
+-    rc = g_vma_api->get_socket_rings_fds(ifd, &ring_fd, 1);
++    rc = extra_api->get_socket_rings_fds(ifd, &ring_fd, 1);
+     if (rc == -1) {
+         rc = SOCKPERF_ERR_SOCKET;
+         return rc;
+     }
+     while (!g_b_exit && poll == 0) {
+-        struct vma_completion_t vma_comps;
+-        poll = g_vma_api->socketxtreme_poll(ring_fd, &vma_comps, 1, 0);
++        C comps;
++        poll = extra_api->socketxtreme_poll(ring_fd, &comps, 1, 0);
+         if (poll > 0) {
+-            if (vma_comps.events & EPOLLOUT) {
++            if (comps.events & EPOLLOUT) {
+                 rc = SOCKPERF_ERR_NONE;
+             }
+         }
+     }
+     return rc;
+ }
++
++static int _connect_check_socketxtreme(int ifd) {
++    if (g_vma_api) {
++#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
++        return _connect_check_socketxtreme_api<decltype(g_vma_api), vma_completion_t>(
++            ifd, g_vma_api);
+ #endif // USING_VMA_EXTRA_API
++    } else {
++#ifdef USING_XLIO_EXTRA_API // For XLIO socketxtreme Only
++        return _connect_check_socketxtreme_api<decltype(g_xlio_api), xlio_socketxtreme_completion_t>(
++            ifd, g_xlio_api);
++#endif // USING_XLIO_EXTRA_API
++    }
++
++    return -1;
++}
++#endif // USING_EXTRA_API
+ 
+ //------------------------------------------------------------------------------
+ static int _connect_check(int ifd, int timeout_ms) {
+@@ -926,11 +943,11 @@ int Client<IoType, SwitchDataIntegrity, SwitchActivityInfo, SwitchCycleDuration,
+                 if (connect(ifd, reinterpret_cast<const sockaddr *>(&(data->server_addr)),
+                             data->server_addr_len) < 0) {
+                     if (os_err_in_progress()) {
+-#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+-                        if (g_pApp->m_const_params.fd_handler_type == SOCKETXTREME && g_vma_api) {
+-                            rc = _connect_check_vma(ifd);
++#ifdef USING_EXTRA_API // For socketxtreme Only
++                        if (g_pApp->m_const_params.fd_handler_type == SOCKETXTREME) {
++                            rc = _connect_check_socketxtreme(ifd);
+                         } else
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+                         {
+                             rc = _connect_check(ifd, s_user_params.tcp_connect_timeout_ms);
+                         }
+@@ -1278,12 +1295,23 @@ void client_handler(handler_info *p_info) {
+             break;
+         }
+ #endif // defined(__FreeBSD__) || defined(__APPLE__)
+-#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
++#ifdef USING_EXTRA_API // For socketxtreme Only
+         case SOCKETXTREME: {
+-            client_handler<IoSocketxtreme>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
++            if (g_vma_api) {
++#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
++                client_handler<IoSocketxtremeVMA>(
++                    p_info->fd_min, p_info->fd_max, p_info->fd_num);
++#endif // USING_VMA_EXTRA_API
++            } else if (g_xlio_api) {
++#ifdef USING_XLIO_EXTRA_API // For XLIO socketxtreme Only
++                client_handler<IoSocketxtremeXLIO>(
++                    p_info->fd_min, p_info->fd_max, p_info->fd_num);
++#endif // USING_XLIO_EXTRA_API
++            }
++
+             break;
+         }
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+ #endif // !WIN32
+         default: {
+             ERROR_MSG("unknown file handler");
+diff --git a/src/client.h b/src/client.h
+index 031a470..0f2ef29 100644
+--- a/src/client.h
++++ b/src/client.h
+@@ -57,10 +57,10 @@ private:
+     IoType m_ioHandler;
+     addr_to_id m_ServerList;
+ 
+-    SwitchDataIntegrity m_switchDataIntegrity;
+-    SwitchActivityInfo m_switchActivityInfo;
+-    SwitchCycleDuration m_switchCycleDuration;
+-    SwitchMsgSize m_switchMsgSize;
++    SwitchDataIntegrity m_switchDataIntegrity; // SwitchOnDataIntegrity | SwitchOff
++    SwitchActivityInfo m_switchActivityInfo; // SwitchOnActivityInfo | SwitchOff
++    SwitchCycleDuration m_switchCycleDuration; // SwitchOnDummySend | SwitchOnCycleDuration | SwitchOff
++    SwitchMsgSize m_switchMsgSize; // SwitchOnMsgSize | SwitchOff
+     PongModeCare m_pongModeCare; // has msg_sendto() method and can be one of: PongModeNormal,
+                                  // PongModeAlways, PongModeNever
+ 
+@@ -173,13 +173,15 @@ private:
+ 
+     //------------------------------------------------------------------------------
+     template <class InputHandler>
+-    inline unsigned int client_receive_from_selected(int ifd) {
++    inline unsigned int client_receive_from_selected_(int ifd) {
+         int ret = 0;
+         struct sockaddr_store_t recvfrom_addr;
+         socklen_t recvfrom_len = sizeof(recvfrom_addr);
+         fds_data *l_fds_ifd = g_fds_array[ifd];
+ 
+-        InputHandler input_handler(m_pMsgReply, l_fds_ifd->recv);
++        InputHandler input_handler(
++            input_handler_helper<InputHandler,IoType>::create_input_handler(
++                m_pMsgReply, l_fds_ifd->recv, m_ioHandler));
+         ret = input_handler.receive_pending_data(ifd, reinterpret_cast<sockaddr *>(&recvfrom_addr), recvfrom_len);
+         if (unlikely(ret <= 0)) {
+             input_handler.cleanup();
+@@ -199,22 +201,38 @@ private:
+         return callback.getReceiveCount();
+     }
+ 
+-    inline unsigned int client_receive_from_selected(int ifd) {
+ #ifdef USING_VMA_EXTRA_API // VMA
+-        if (SOCKETXTREME == g_pApp->m_const_params.fd_handler_type && g_vma_api) {
+-            return client_receive_from_selected<SocketXtremeInputHandler>(ifd);
+-        }
++    template <typename T = IoType>
++    inline std::enable_if_t<is_vma_bufftype<T>::value, unsigned int>
++    client_receive_from_selected(int ifd) {
++        return client_receive_from_selected_<VmaSocketXtremeInputHandler>(ifd);
++    }
++#endif
+ 
++#ifdef USING_XLIO_EXTRA_API // XLIO
++    template <typename T = IoType>
++    inline std::enable_if_t<is_xlio_bufftype<T>::value, unsigned int>
++    client_receive_from_selected(int ifd) {
++        return client_receive_from_selected_<XlioSocketXtremeInputHandler>(ifd);
++    }
++#endif
++
++    template <typename T = IoType>
++    inline std::enable_if_t<!(
++        is_vma_bufftype<T>{} ||
++        is_xlio_bufftype<T>{}), unsigned int>
++        client_receive_from_selected(int ifd) {
++#ifdef USING_VMA_EXTRA_API // VMA
+         if (g_pApp->m_const_params.is_zcopyread && g_vma_api) {
+-            return client_receive_from_selected<VmaZCopyReadInputHandler>(ifd);
++            return client_receive_from_selected_<VmaZCopyReadInputHandler>(ifd);
+         }
+ #endif // USING_VMA_EXTRA_API
+ #ifdef USING_XLIO_EXTRA_API // XLIO
+         if (g_pApp->m_const_params.is_zcopyread && g_xlio_api) {
+-            return client_receive_from_selected<XlioZCopyReadInputHandler>(ifd);
++            return client_receive_from_selected_<XlioZCopyReadInputHandler>(ifd);
+         }
+ #endif // USING_XLIO_EXTRA_API
+-        return client_receive_from_selected<RecvFromInputHandler>(ifd);
++        return client_receive_from_selected_<RecvFromInputHandler>(ifd);
+     }
+ 
+     inline bool handle_message(int ifd, struct sockaddr_store_t &recvfrom_addr, socklen_t recvfrom_addrlen, int &receiveCount)
+@@ -328,12 +346,12 @@ private:
+         // send
+         for (unsigned i = 0; i < g_pApp->m_const_params.burst_size && !g_b_exit; i++) {
+             client_send_packet(ifd);
+-#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
++#ifdef USING_EXTRA_API // For VMA socketxtreme Only
+             if (g_pApp->m_const_params.fd_handler_type == SOCKETXTREME &&
+                 !g_pApp->m_const_params.b_client_ping_pong) {
+                 m_ioHandler.waitArrival();
+             }
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+         }
+ 
+         m_switchActivityInfo.execute(m_pMsgRequest->getSequenceCounter());
+diff --git a/src/common.cpp b/src/common.cpp
+index 0cb1a76..52de7d6 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -240,9 +240,9 @@ const char *handler2str(fd_block_handler_t type) {
+ #elif defined(__APPLE__) || defined(__FreeBSD__)
+                                                             "kqueue",
+ #endif // defined(__APPLE__) || defined(__FreeBSD__)
+-#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
++#ifdef USING_EXTRA_API // For socketxtreme Only
+                                                             "socketxtreme"
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+ #endif // !WIN32
+     };
+ 
+diff --git a/src/defs.cpp b/src/defs.cpp
+index fb085eb..4e5dd24 100644
+--- a/src/defs.cpp
++++ b/src/defs.cpp
+@@ -42,11 +42,6 @@ TicksTime g_cycleStartTime;
+ debug_level_t g_debug_level = LOG_LVL_INFO;
+ 
+ #ifdef USING_EXTRA_API
+-#ifdef USING_VMA_EXTRA_API // VMA
+-struct vma_buff_t *g_vma_buff = NULL;
+-struct vma_completion_t *g_vma_comps;
+-#endif // USING_VMA_EXTRA_API
+-
+ ZeroCopyData::ZeroCopyData() : m_pkt_buf(NULL), m_pkts(NULL) {}
+ 
+ void ZeroCopyData::allocate() { m_pkt_buf = (unsigned char *)MALLOC(Message::getMaxSize()); }
+diff --git a/src/defs.h b/src/defs.h
+index faeaa1e..04ed0e8 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -503,10 +503,6 @@ extern TicksTime g_cycleStartTime;
+ extern debug_level_t g_debug_level;
+ 
+ #ifdef USING_EXTRA_API
+-#ifdef USING_VMA_EXTRA_API // VMA
+-extern struct vma_buff_t *g_vma_buff;
+-extern struct vma_completion_t *g_vma_comps;
+-#endif // USING_VMA_EXTRA_API
+ class ZeroCopyData {
+ public:
+     ZeroCopyData();
+@@ -569,9 +565,9 @@ struct fds_data {
+     IPAddress mc_source_ip_addr;    /**< message source ip for multicast packet filtering */
+     int memberships_size = 0;
+     struct SocketRecvData recv;
+-#ifdef USING_VMA_EXTRA_API // VMA callback-extra-api Only
+-    Message *p_msg = nullptr; // For VMA callback API.
+-#endif // USING_VMA_EXTRA_API
++#ifdef USING_EXTRA_API // callback-extra-api Only
++    Message *p_msg = nullptr;
++#endif // USING_EXTRA_API
+ #if defined(DEFINED_TLS)
+     void *tls_handle = nullptr;
+ #endif /* DEFINED_TLS */
+@@ -651,32 +647,50 @@ struct equal_to<struct sockaddr_store_t> :
+ };
+ } // namespace std
+ 
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+-struct vma_ring_comps {
+-    vma_completion_t vma_comp_list[MAX_SOCKETXTREME_COMPS];
+-    int vma_comp_list_size;
++#ifdef USING_EXTRA_API // socketxtreme-extra-api Only
++template <class T> // T is vma_completion_t | xlio_socketxtreme_completion_t
++struct socketxtreme_ring_comps {
++    T comp_list[MAX_SOCKETXTREME_COMPS];
++    int comp_list_size;
+     bool is_freed;
+ };
+-#endif // USING_VMA_EXTRA_API
++
++template<class T> // T is vma_completion_t | xlio_socketxtreme_completion_t
++using socketxtreme_rings_comps_map = std::unordered_map<int, struct socketxtreme_ring_comps<T> *>;
++
++typedef std::queue<int> socketxtreme_comps_queue;
++#endif // USING_EXTRA_API
+ 
+ typedef std::unordered_map<struct sockaddr_store_t, clt_session_info_t> seq_num_map;
+ typedef std::unordered_map<IPAddress, size_t> addr_to_id;
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+-typedef std::unordered_map<int, struct vma_ring_comps *> rings_vma_comps_map;
+-#endif // USING_VMA_EXTRA_API
+ 
+ extern fds_data **g_fds_array;
+ extern int IGMP_MAX_MEMBERSHIPS;
+ 
++template<typename _Tp, class Enable = void>
++struct is_vma_bufftype
++: public std::false_type {};
++
++template<typename _Tp, class Enable = void>
++struct is_xlio_bufftype
++: public std::false_type {};
++
+ #ifdef USING_VMA_EXTRA_API // VMA
+-typedef std::queue<int> vma_comps_queue;
+ extern struct vma_api_t *g_vma_api;
++
++template<typename _Tp>
++struct is_vma_bufftype<_Tp, typename std::enable_if_t<std::is_same<typename _Tp::buff_type, vma_buff_t>::value>>
++: public std::true_type {};
+ #else
+ extern void *g_vma_api; // Dummy variable
+ #endif // USING_VMA_EXTRA_API
+ 
+ #ifdef USING_XLIO_EXTRA_API // XLIO
+ extern struct xlio_api_t *g_xlio_api;
++
++template<typename _Tp>
++struct is_xlio_bufftype<_Tp, typename std::enable_if_t<std::is_same<typename _Tp::buff_type, xlio_buff_t>::value>>
++: public std::true_type {};
+ #else
+ extern void *g_xlio_api; // Dummy variable
+ #endif // USING_XLIO_EXTRA_API
+@@ -740,8 +754,6 @@ struct user_params_t {
+     uint32_t warmup_msec = 0;
+     uint64_t cooldown_num = 0;
+     uint64_t warmup_num = 0;
+-    bool is_vmarxfiltercb = false;
+-    bool is_vmazcopyread = false;
+     TicksDuration cycleDuration;
+     bool mc_loop_disable = true;
+     bool uc_reuseaddr = false;
+diff --git a/src/input_handlers.h b/src/input_handlers.h
+index 714fcc3..4578ffe 100644
+--- a/src/input_handlers.h
++++ b/src/input_handlers.h
+@@ -119,7 +119,66 @@ public:
+     }
+ };
+ 
++template <class InputHandler, class IoType>
++struct input_handler_helper
++{
++    inline static InputHandler create_input_handler(Message *msg, SocketRecvData &recv, IoType& ioHandler) {
++        return InputHandler(msg, recv);
++    }
++};
++
+ #ifdef USING_EXTRA_API
++// T is vma_buff_t | xlio_buff_t
++template <class T>
++class SocketXtremeInputHandler : public MessageParser<BufferAccumulation> {
++private:
++    SocketRecvData &m_recv_data;
++    T *m_sockxtreme_buff;
++    void *m_src;
++protected:
++    /** Receive pending data from a socket
++     * @param [in] socket descriptor
++     * @param [out] recvfrom_addr address to save peer address into
++     * @param [inout] in - storage size, out - actual address size
++     * @param [in] sockxtreme_buff socketxtreme buffer
++     * @param [in] sockxtreme_comp socketxtreme completion
++     * @return status code
++     */
++    inline int receive_pending_data(
++        int fd, struct sockaddr *recvfrom_addr, socklen_t &size, T* sockxtreme_buff)
++    {
++        size = sizeof(sockaddr_in);
++        std::memcpy(recvfrom_addr, m_src, size);
++        m_sockxtreme_buff = sockxtreme_buff;
++        if (likely(m_sockxtreme_buff)) {
++            return m_sockxtreme_buff->len;
++        }
++
++        return 0;
++    }
++public:
++    inline SocketXtremeInputHandler(Message *msg, SocketRecvData &recv_data, void *src):
++        MessageParser<BufferAccumulation>(msg),
++        m_recv_data(recv_data), m_sockxtreme_buff(nullptr), m_src(src)
++    {}
++
++    template <class Callback>
++    inline bool iterate_over_buffers(Callback &callback)
++    {
++        for (T *cur = m_sockxtreme_buff; cur; cur = cur->next) {
++            bool res = process_buffer(callback, m_recv_data, (uint8_t *)cur->payload, cur->len);
++            if (unlikely(!res)) {
++                return false;
++            }
++        }
++        return true;
++    }
++
++    inline void cleanup()
++    {
++    }
++};
++
+ typedef int(* recvfrom_zcopy_func_t)(int __fd, void *__buf, size_t __nbytes, int *__flags,
+                                      struct sockaddr *__from, socklen_t *__fromlen);
+ 
+@@ -228,16 +287,13 @@ public:
+ };
+ 
+ #ifdef USING_VMA_EXTRA_API // VMA
+-class SocketXtremeInputHandler : public MessageParser<BufferAccumulation> {
++class VmaSocketXtremeInputHandler : public SocketXtremeInputHandler<vma_buff_t> {
+ private:
+-    SocketRecvData &m_recv_data;
+-    vma_buff_t *m_vma_buff;
++    vma_buff_t *m_curr_buff;
+ public:
+-    inline SocketXtremeInputHandler(Message *msg, SocketRecvData &recv_data):
+-        MessageParser<BufferAccumulation>(msg),
+-        m_recv_data(recv_data),
+-        m_vma_buff(NULL)
+-    {}
++    inline VmaSocketXtremeInputHandler(
++        Message *msg, SocketRecvData &recv_data, vma_buff_t *curr_buff, void *src):
++        SocketXtremeInputHandler(msg, recv_data, src), m_curr_buff(curr_buff) {}
+ 
+     /** Receive pending data from a socket
+      * @param [in] socket descriptor
+@@ -247,30 +303,8 @@ public:
+      */
+     inline int receive_pending_data(int fd, struct sockaddr *recvfrom_addr, socklen_t &size)
+     {
+-        size = sizeof(sockaddr_in);
+-        std::memcpy(recvfrom_addr, &g_vma_comps->src, size);
+-        m_vma_buff = g_vma_buff;
+-        if (likely(m_vma_buff)) {
+-            return m_vma_buff->len;
+-        } else {
+-            return 0;
+-        }
+-    }
+-
+-    template <class Callback>
+-    inline bool iterate_over_buffers(Callback &callback)
+-    {
+-        for (vma_buff_t *cur = m_vma_buff; cur; cur = cur->next) {
+-            bool res = process_buffer(callback, m_recv_data, (uint8_t *)cur->payload, cur->len);
+-            if (unlikely(!res)) {
+-                return false;
+-            }
+-        }
+-        return true;
+-    }
+-
+-    inline void cleanup()
+-    {
++        return SocketXtremeInputHandler<vma_buff_t>::receive_pending_data(
++            fd, recvfrom_addr, size, m_curr_buff);
+     }
+ };
+ 
+@@ -289,9 +323,40 @@ public:
+         }
+     }
+ };
++
++template <class IoType>
++struct input_handler_helper<VmaSocketXtremeInputHandler, IoType>
++{
++    inline static VmaSocketXtremeInputHandler create_input_handler(
++            Message *msg, SocketRecvData &recv, IoType& ioHandler) {
++        return VmaSocketXtremeInputHandler(
++            msg, recv, ioHandler.get_last_buff(), &ioHandler.get_last_comp()->src);
++    }
++};
+ #endif // USING_VMA_EXTRA_API
+ 
+ #ifdef USING_XLIO_EXTRA_API // XLIO extra-api Only
++class XlioSocketXtremeInputHandler : public SocketXtremeInputHandler<xlio_buff_t> {
++private:
++    xlio_buff_t *m_curr_buff;
++public:
++    inline XlioSocketXtremeInputHandler(
++            Message *msg, SocketRecvData &recv_data, xlio_buff_t *curr_buff, void *src):
++        SocketXtremeInputHandler(msg, recv_data, src), m_curr_buff(curr_buff) {}
++
++    /** Receive pending data from a socket
++     * @param [in] socket descriptor
++     * @param [out] recvfrom_addr address to save peer address into
++     * @param [inout] in - storage size, out - actual address size
++     * @return status code
++     */
++    inline int receive_pending_data(int fd, struct sockaddr *recvfrom_addr, socklen_t &size)
++    {
++        return SocketXtremeInputHandler<xlio_buff_t>::receive_pending_data(
++            fd, recvfrom_addr, size, m_curr_buff);
++    }
++};
++
+ class XlioZCopyReadInputHandler :
+     public ZCopyReadInputHandler<xlio_recvfrom_zcopy_packet_t, xlio_recvfrom_zcopy_packets_t, MSG_XLIO_ZCOPY> {
+ public:
+@@ -309,8 +374,16 @@ public:
+         }
+     }
+ };
+-#endif // USING_XLIO_EXTRA_API
+ 
++template <class IoType>
++struct input_handler_helper<XlioSocketXtremeInputHandler, IoType>
++{
++    inline static XlioSocketXtremeInputHandler create_input_handler(
++            Message *msg, SocketRecvData &recv, IoType& ioHandler) {
++        return XlioSocketXtremeInputHandler(
++            msg, recv, ioHandler.get_last_buff(), &ioHandler.get_last_comp()->src);
++    }
++};
++#endif // USING_XLIO_EXTRA_API
+ #endif // USING_EXTRA_API
+-
+ #endif // INPUT_HANDLERS_H_
+diff --git a/src/iohandlers.cpp b/src/iohandlers.cpp
+index f5c1ce2..0903bfe 100644
+--- a/src/iohandlers.cpp
++++ b/src/iohandlers.cpp
+@@ -28,7 +28,7 @@
+ 
+ #include "iohandlers.h"
+ 
+-static void print_addresses(const fds_data *data, int &list_count)
++void print_addresses(const fds_data *data, int &list_count)
+ {
+     {
+         char hbuf[NI_MAXHOST] = "(unknown)";
+@@ -314,61 +314,4 @@ int IoKqueue::prepareNetwork() {
+     return rc;
+ }
+ #endif // defined(__FreeBSD__) || defined(__APPLE__)
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+-//==============================================================================
+-//------------------------------------------------------------------------------
+-IoSocketxtreme::IoSocketxtreme(int _fd_min, int _fd_max, int _fd_num)
+-    : IoHandler(_fd_min, _fd_max, _fd_num, 0, 0) {
+-    m_current_vma_ring_comp = NULL;
+-}
+-
+-//------------------------------------------------------------------------------
+-IoSocketxtreme::~IoSocketxtreme() {
+-    for (m_rings_vma_comps_map_itr = m_rings_vma_comps_map.begin();
+-         m_rings_vma_comps_map_itr != m_rings_vma_comps_map.end(); ++m_rings_vma_comps_map_itr) {
+-        FREE(m_rings_vma_comps_map_itr->second);
+-    }
+-}
+-
+-//------------------------------------------------------------------------------
+-int IoSocketxtreme::prepareNetwork() {
+-    int rc = SOCKPERF_ERR_NONE;
+-    int list_count = 0;
+-    int ring_fd = 0;
+-
+-    printf("\n");
+-    for (int ifd = m_fd_min; ifd <= m_fd_max; ifd++) {
+-        if (g_fds_array[ifd]) {
+-            ring_fd = 0;
+-            int rings = g_vma_api->get_socket_rings_fds(ifd, &ring_fd, 1);
+-            if (rings == -1) {
+-                rc = SOCKPERF_ERR_SOCKET;
+-                return rc;
+-            }
+-            rings_vma_comps_map::iterator itr = m_rings_vma_comps_map.find(ring_fd);
+-            if (itr == m_rings_vma_comps_map.end()) {
+-                vma_ring_comps *temp = NULL;
+-                temp = (struct vma_ring_comps *)MALLOC(sizeof(vma_ring_comps));
+-                if (!temp) {
+-                    log_err("Failed to allocate memory");
+-                    rc = SOCKPERF_ERR_NO_MEMORY;
+-                }
+-                memset(temp, 0, sizeof(vma_ring_comps));
+-                temp->is_freed = true;
+-                temp->vma_comp_list_size = 0;
+-
+-                std::pair<rings_vma_comps_map::iterator, bool> ret =
+-                    m_rings_vma_comps_map.insert(std::make_pair(ring_fd, temp));
+-                if (!ret.second) {
+-                    log_err("Failed to insert new ring.");
+-                    rc = SOCKPERF_ERR_NO_MEMORY;
+-                }
+-            }
+-
+-            print_addresses(g_fds_array[ifd], list_count);
+-        }
+-    }
+-    return rc;
+-}
+-#endif // USING_VMA_EXTRA_API
+ #endif // !WIN32
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 25d0b09..1090c6e 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -32,6 +32,8 @@
+ #include "defs.h"
+ #include "common.h"
+ 
++void print_addresses(const fds_data *data, int &list_count);
++
+ //==============================================================================
+ class IoHandler {
+ public:
+@@ -452,11 +454,37 @@ private:
+     int m_max_events;
+ };
+ #endif // defined(__FreeBSD__) || defined(__APPLE__) 
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
++#ifdef USING_EXTRA_API // socketxtreme-extra-api Only
+ //==============================================================================
++// T is vma_buff_t | xlio_buff_t
++// C is vma_completion_t | xlio_socketxtreme_completion_t
++template <class T, class C, typename API>
+ class IoSocketxtreme : public IoHandler {
+ public:
+-    IoSocketxtreme(int _fd_min, int _fd_max, int _fd_num);
++    typedef T buff_type;
++
++#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
++    template <class K = T, typename std::enable_if_t<std::is_same<vma_buff_t,K>::value, bool> = true>
++    IoSocketxtreme(int _fd_min, int _fd_max, int _fd_num)
++        : IoHandler(_fd_min, _fd_max, _fd_num, 0, 0)
++        , m_extra_api(g_vma_api), m_flag_sx_packet(VMA_SOCKETXTREME_PACKET)
++        , m_flag_sx_new_conn_accepted(VMA_SOCKETXTREME_NEW_CONNECTION_ACCEPTED)
++        , m_current_ring_comp(nullptr)
++    {
++    }
++#endif // USING_VMA_EXTRA_API
++
++#ifdef USING_XLIO_EXTRA_API // XLIO socketxtreme-extra-api Only
++    template <class K = T, typename std::enable_if_t<std::is_same<xlio_buff_t,K>::value, bool> = true>
++    IoSocketxtreme(int _fd_min, int _fd_max, int _fd_num)
++        : IoHandler(_fd_min, _fd_max, _fd_num, 0, 0)
++        , m_extra_api(g_xlio_api), m_flag_sx_packet(XLIO_SOCKETXTREME_PACKET)
++        , m_flag_sx_new_conn_accepted(XLIO_SOCKETXTREME_NEW_CONNECTION_ACCEPTED)
++        , m_current_ring_comp(nullptr)
++    {
++    }
++#endif // USING_XLIO_EXTRA_API
++
+     virtual ~IoSocketxtreme();
+ 
+     //------------------------------------------------------------------------------
+@@ -489,35 +517,52 @@ public:
+             }
+         }
+     }
++
++#ifdef USING_VMA_EXTRA_API // VMA
++    template <typename K = T>
++    inline std::enable_if_t<std::is_same<K,vma_buff_t>::value, void>
++    sx_free_packets(int i) {
++        m_extra_api->socketxtreme_free_vma_packets(
++            &m_rings_comps_map_itr->second->comp_list[i].packet, 1);
++    }
++#endif
++
++#ifdef USING_XLIO_EXTRA_API // XLIO
++    template <typename K = T>
++    inline std::enable_if_t<std::is_same<K,xlio_buff_t>::value, void>
++    sx_free_packets(int i) {
++        m_extra_api->socketxtreme_free_packets(
++            &m_rings_comps_map_itr->second->comp_list[i].packet, 1);
++    }
++#endif
++
+     //------------------------------------------------------------------------------
+     inline int waitArrival() {
+         m_look_end = 0;
+-        for (m_rings_vma_comps_map_itr = m_rings_vma_comps_map.begin();
+-             m_rings_vma_comps_map_itr != m_rings_vma_comps_map.end();
+-             ++m_rings_vma_comps_map_itr) {
+-            int ring_fd = m_rings_vma_comps_map_itr->first;
+-            if (!m_rings_vma_comps_map_itr->second->is_freed) {
+-                for (int i = 0; i < m_rings_vma_comps_map_itr->second->vma_comp_list_size; i++) {
+-                    if (m_rings_vma_comps_map_itr->second->vma_comp_list[i].events &
+-                        VMA_SOCKETXTREME_PACKET) {
+-                        g_vma_api->socketxtreme_free_vma_packets(
+-                            &m_rings_vma_comps_map_itr->second->vma_comp_list[i].packet, 1);
++        for (m_rings_comps_map_itr = m_rings_comps_map.begin();
++             m_rings_comps_map_itr != m_rings_comps_map.end();
++             ++m_rings_comps_map_itr) {
++            int ring_fd = m_rings_comps_map_itr->first;
++            if (!m_rings_comps_map_itr->second->is_freed) {
++                for (int i = 0; i < m_rings_comps_map_itr->second->comp_list_size; i++) {
++                    if (m_rings_comps_map_itr->second->comp_list[i].events & m_flag_sx_packet) {
++                        sx_free_packets(i);
+                     }
+                 }
+-                memset(m_rings_vma_comps_map_itr->second->vma_comp_list, 0,
+-                       m_rings_vma_comps_map_itr->second->vma_comp_list_size *
+-                           sizeof(vma_completion_t));
+-                m_rings_vma_comps_map_itr->second->is_freed = true;
+-                m_rings_vma_comps_map_itr->second->vma_comp_list_size = 0;
++                memset(m_rings_comps_map_itr->second->comp_list, 0,
++                       m_rings_comps_map_itr->second->comp_list_size *
++                           sizeof(C));
++                m_rings_comps_map_itr->second->is_freed = true;
++                m_rings_comps_map_itr->second->comp_list_size = 0;
+             }
+-            m_rings_vma_comps_map_itr->second->vma_comp_list_size = g_vma_api->socketxtreme_poll(
+-                ring_fd, (vma_completion_t *)(&m_rings_vma_comps_map_itr->second->vma_comp_list),
++            m_rings_comps_map_itr->second->comp_list_size = m_extra_api->socketxtreme_poll(
++                ring_fd, (C *)(&m_rings_comps_map_itr->second->comp_list),
+                 MAX_SOCKETXTREME_COMPS, 0);
+ 
+-            if (m_rings_vma_comps_map_itr->second->vma_comp_list_size > 0) {
+-                m_vma_comps_queue.push(ring_fd);
+-                m_rings_vma_comps_map_itr->second->is_freed = false;
+-                m_look_end += m_rings_vma_comps_map_itr->second->vma_comp_list_size;
++            if (m_rings_comps_map_itr->second->comp_list_size > 0) {
++                m_comps_queue.push(ring_fd);
++                m_rings_comps_map_itr->second->is_freed = false;
++                m_look_end += m_rings_comps_map_itr->second->comp_list_size;
+             }
+         }
+         return m_look_end;
+@@ -526,46 +571,123 @@ public:
+     inline int analyzeArrival(int ifd) {
+         assert((ifd < max_fds_num) && "exceeded tool limitation (max_fds_num)");
+         int ring_fd = 0;
+-        g_vma_buff = NULL;
+-        if (!m_current_vma_ring_comp) {
+-            ring_fd = m_vma_comps_queue.front();
+-            m_vma_comps_queue.pop();
+-            m_rings_vma_comps_map_itr = m_rings_vma_comps_map.find(ring_fd);
+-            if (m_rings_vma_comps_map_itr != m_rings_vma_comps_map.end()) {
+-                m_current_vma_ring_comp = m_rings_vma_comps_map_itr->second;
+-                m_vma_comp_index = 0;
++        m_sx_curr_buff = NULL;
++        if (!m_current_ring_comp) {
++            ring_fd = m_comps_queue.front();
++            m_comps_queue.pop();
++            m_rings_comps_map_itr = m_rings_comps_map.find(ring_fd);
++            if (m_rings_comps_map_itr != m_rings_comps_map.end()) {
++                m_current_ring_comp = m_rings_comps_map_itr->second;
++                m_comp_index = 0;
+             }
+         }
+ 
+-        g_vma_comps = (vma_completion_t *)&m_current_vma_ring_comp->vma_comp_list[m_vma_comp_index];
+-        if (g_vma_comps->events & VMA_SOCKETXTREME_NEW_CONNECTION_ACCEPTED) {
+-            ifd = g_vma_comps->listen_fd;
+-        } else if (g_vma_comps->events & VMA_SOCKETXTREME_PACKET) {
+-            g_vma_buff = g_vma_comps->packet.buff_lst;
+-            ifd = g_vma_comps->user_data;
+-        } else if (g_vma_comps->events & (EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
+-            ifd = g_vma_comps->user_data;
++        m_sx_curr_comp = (C *)&m_current_ring_comp->comp_list[m_comp_index];
++        if (m_sx_curr_comp->events & m_flag_sx_new_conn_accepted) {
++            ifd = m_sx_curr_comp->listen_fd;
++        } else if (m_sx_curr_comp->events & m_flag_sx_packet) {
++            m_sx_curr_buff = m_sx_curr_comp->packet.buff_lst;
++            ifd = m_sx_curr_comp->user_data;
++        } else if (m_sx_curr_comp->events & (EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
++            ifd = m_sx_curr_comp->user_data;
+         } else {
+             ifd = 0;
+         }
+ 
+-        m_vma_comp_index++;
+-        if (m_vma_comp_index == m_current_vma_ring_comp->vma_comp_list_size) {
+-            m_vma_comp_index = 0;
+-            m_current_vma_ring_comp = NULL;
++        m_comp_index++;
++        if (m_comp_index == m_current_ring_comp->comp_list_size) {
++            m_comp_index = 0;
++            m_current_ring_comp = NULL;
+         }
+         return ifd;
+     }
+ 
+     virtual int prepareNetwork();
+ 
++    C *get_last_comp() { return m_sx_curr_comp; }
++    T *get_last_buff() { return m_sx_curr_buff; }
++
+ private:
+-    int m_vma_comp_index;
+-    vma_ring_comps *m_current_vma_ring_comp;
+-    vma_comps_queue m_vma_comps_queue;
+-    rings_vma_comps_map m_rings_vma_comps_map;
+-    rings_vma_comps_map::iterator m_rings_vma_comps_map_itr;
++    API m_extra_api;
++    C *m_sx_curr_comp;
++    T *m_sx_curr_buff;
++    uint64_t m_flag_sx_packet;
++    uint64_t m_flag_sx_new_conn_accepted;
++
++    int m_comp_index;
++    socketxtreme_ring_comps<C> *m_current_ring_comp;
++    socketxtreme_comps_queue m_comps_queue;
++    socketxtreme_rings_comps_map<C> m_rings_comps_map;
++    typename socketxtreme_rings_comps_map<C>::iterator m_rings_comps_map_itr;
+ };
++
++template <class T, class C, typename API>
++IoSocketxtreme<T,C,API>::~IoSocketxtreme() {
++    for (m_rings_comps_map_itr = m_rings_comps_map.begin();
++         m_rings_comps_map_itr != m_rings_comps_map.end(); ++m_rings_comps_map_itr) {
++        FREE(m_rings_comps_map_itr->second);
++    }
++}
++
++template <class T, class C, typename API>
++int IoSocketxtreme<T,C,API>::prepareNetwork() {
++    int rc = SOCKPERF_ERR_NONE;
++    int list_count = 0;
++    int ring_fd = 0;
++
++    printf("\n");
++    for (int ifd = m_fd_min; ifd <= m_fd_max; ifd++) {
++        if (g_fds_array[ifd]) {
++            ring_fd = 0;
++            int rings = -1;
++            if (g_vma_api) {
++#ifdef USING_VMA_EXTRA_API // VMA Socketxtreme Only
++                rings = g_vma_api->get_socket_rings_fds(ifd, &ring_fd, 1);
++#endif // USING_VMA_EXTRA_API
++            } else {
++#ifdef USING_XLIO_EXTRA_API // XLIO Socketxtreme Only
++                rings = g_xlio_api->get_socket_rings_fds(ifd, &ring_fd, 1);
++#endif // USING_XLIO_EXTRA_API
++            }
++
++            if (rings == -1) {
++                rc = SOCKPERF_ERR_SOCKET;
++                return rc;
++            }
++            typename socketxtreme_rings_comps_map<C>::iterator itr = m_rings_comps_map.find(ring_fd);
++            if (itr == m_rings_comps_map.end()) {
++                socketxtreme_ring_comps<C> *temp = NULL;
++                temp = (struct socketxtreme_ring_comps<C> *)MALLOC(sizeof(socketxtreme_ring_comps<C>));
++                if (!temp) {
++                    log_err("Failed to allocate memory");
++                    rc = SOCKPERF_ERR_NO_MEMORY;
++                }
++                memset(temp, 0, sizeof(socketxtreme_ring_comps<C>));
++                temp->is_freed = true;
++                temp->comp_list_size = 0;
++
++                std::pair<typename socketxtreme_rings_comps_map<C>::iterator, bool> ret =
++                    m_rings_comps_map.insert(std::make_pair(ring_fd, temp));
++                if (!ret.second) {
++                    log_err("Failed to insert new ring.");
++                    rc = SOCKPERF_ERR_NO_MEMORY;
++                }
++            }
++
++            print_addresses(g_fds_array[ifd], list_count);
++        }
++    }
++    return rc;
++}
++
++#ifdef USING_VMA_EXTRA_API // VMA Socketxtreme Only
++typedef IoSocketxtreme<vma_buff_t, vma_completion_t, decltype(g_vma_api)> IoSocketxtremeVMA;
+ #endif // USING_VMA_EXTRA_API
++
++#ifdef USING_XLIO_EXTRA_API // XLIO Socketxtreme Only
++typedef IoSocketxtreme<xlio_buff_t, xlio_socketxtreme_completion_t, decltype(g_xlio_api)> IoSocketxtremeXLIO;
++#endif // USING_XLIO_EXTRA_API
++
++#endif // USING_EXTRA_API
+ #endif // !WIN32
+ #endif // IOHANDLERS_H_
+diff --git a/src/server.cpp b/src/server.cpp
+index dd6a439..5a8f536 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -72,9 +72,9 @@ int ServerBase::initBeforeLoop() {
+         for (int ifd = m_ioHandlerRef.m_fd_min; ifd <= m_ioHandlerRef.m_fd_max; ifd++) {
+ 
+             if (!(g_fds_array[ifd] && (g_fds_array[ifd]->active_fd_list))) continue;
+-#ifdef USING_VMA_EXTRA_API // VMA callback-extra-api Only
++#ifdef USING_EXTRA_API // callback-extra-api Only
+             g_fds_array[ifd]->p_msg = m_pMsgReply;
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+             const sockaddr_store_t *p_bind_addr = &g_fds_array[ifd]->server_addr;
+             socklen_t bind_addr_len = g_fds_array[ifd]->server_addr_len;
+ 
+@@ -273,16 +273,9 @@ int Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_accept(int ifd) {
+         tmp->recv.cur_offset = 0;
+         tmp->recv.cur_size = tmp->recv.max_size;
+ 
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+-        if (g_vma_api && g_pApp->m_const_params.fd_handler_type == SOCKETXTREME) {
+-            active_ifd = g_vma_comps->user_data;
+-        } else
+-#endif // USING_VMA_EXTRA_API
+-        {
+-            active_ifd = (int)accept(
+-                ifd, (struct sockaddr *)&addr,
+-                (socklen_t *)&addr_size); // TODO: use SOCKET all over the way and avoid this cast
+-        }
++        // TODO: use SOCKET all over the way and avoid this cast
++        active_ifd = get_active_ifd(ifd, (struct sockaddr *)&addr, (socklen_t *)&addr_size);
++
+         if (active_ifd < 0) {
+             active_ifd =
+                 (int)INVALID_SOCKET; // TODO: use SOCKET all over the way and avoid this cast
+@@ -311,19 +304,10 @@ int Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_accept(int ifd) {
+                             active_fd_list[i] = active_ifd;
+                             g_fds_array[ifd]->active_fd_count++;
+                             g_fds_array[active_ifd] = tmp.release();
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+-                            if (g_vma_api &&
+-                                g_pApp->m_const_params.fd_handler_type == SOCKETXTREME) {
+-                                std::string hostport = sockaddr_to_hostport(g_vma_comps->src);
+-                                log_dbg("peer address to accept: %s [%d]",
+-                                        hostport.c_str(), active_ifd);
+-                            } else
+-#endif // USING_VMA_EXTRA_API
+-                            {
+-                                std::string hostport = sockaddr_to_hostport(addr);
+-                                log_dbg("peer address to accept: %s [%d]",
+-                                        hostport.c_str(), active_ifd);
+-                            }
++
++                            std::string hostport = sockaddr_to_hostport(get_last_src(addr));
++                            log_dbg("peer address to accept: %s [%d]",
++                                    hostport.c_str(), active_ifd);
+ #if defined(DEFINED_TLS)
+                             if (g_pApp->m_const_params.tls) {
+                                 g_fds_array[active_ifd]->tls_handle = tls_establish(active_ifd);
+@@ -352,18 +336,10 @@ int Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_accept(int ifd) {
+                 if (tmp->active_fd_list) {
+                     FREE(tmp->active_fd_list);
+                 }
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+-                if (g_vma_api && g_pApp->m_const_params.fd_handler_type == SOCKETXTREME) {
+-                    std::string hostport = sockaddr_to_hostport(g_vma_comps->src);
+-                    log_dbg("peer address to refuse: %s [%d]",
+-                            hostport.c_str(), active_ifd);
+-                } else
+-#endif // USING_VMA_EXTRA_API
+-                {
+-                    std::string hostport = sockaddr_to_hostport(addr);
+-                    log_dbg("peer address to refuse: %s [%d]", hostport.c_str(),
+-                            active_ifd);
+-                }
++
++                std::string hostport = sockaddr_to_hostport(get_last_src(addr));
++                log_dbg("peer address to refuse: %s [%d]", hostport.c_str(),
++                        active_ifd);
+             }
+         }
+     }
+@@ -428,12 +404,22 @@ void server_handler(handler_info *p_info) {
+             break;
+         }
+ #endif // defined(__FreeBSD__) || defined(__APPLE__)
+-#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
++#ifdef USING_EXTRA_API // VMA socketxtreme-extra-api Only
+         case SOCKETXTREME: {
+-            server_handler<IoSocketxtreme>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
++            if (g_vma_api) {
++#ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
++                server_handler<IoSocketxtremeVMA>(
++                    p_info->fd_min, p_info->fd_max, p_info->fd_num);
++#endif // USING_VMA_EXTRA_API
++            } else if (g_xlio_api) {
++#ifdef USING_XLIO_EXTRA_API // XLIO socketxtreme-extra-api Only
++                server_handler<IoSocketxtremeXLIO>(
++                    p_info->fd_min, p_info->fd_max, p_info->fd_num);
++#endif // USING_XLIO_EXTRA_API
++            }
+             break;
+         }
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+ #endif
+         default:
+             ERROR_MSG("unknown file handler");
+diff --git a/src/server.h b/src/server.h
+index 91188cc..690a6c0 100644
+--- a/src/server.h
++++ b/src/server.h
+@@ -83,13 +83,38 @@ class Server : public ServerBase {
+ private:
+     IoType m_ioHandler;
+ 
++#ifdef USING_EXTRA_API // Socketxtreme Only
++    template <typename T = IoType>
++    inline std::enable_if_t<(is_vma_bufftype<T>{} || is_xlio_bufftype<T>{}), int>
++    get_active_ifd(int ifd, struct sockaddr *addr, socklen_t *addr_size) {
++        return m_ioHandler.get_last_comp()->user_data;
++    }
++
++    template <typename T = IoType>
++    inline std::enable_if_t<(is_vma_bufftype<T>{} || is_xlio_bufftype<T>{}), const sockaddr_in &>
++    get_last_src(const sockaddr_store_t &src) {
++        return m_ioHandler.get_last_comp()->src;
++    }
++#endif
++
++    template <typename T = IoType>
++    inline std::enable_if_t<!(is_vma_bufftype<T>{} || is_xlio_bufftype<T>{}), int>
++    get_active_ifd(int ifd, struct sockaddr *addr, socklen_t *addr_size) {
++        return accept(ifd, addr, addr_size); 
++    }
++
++    template <typename T = IoType>
++    inline std::enable_if_t<!(is_vma_bufftype<T>{} || is_xlio_bufftype<T>{}), const sockaddr_store_t &>
++    get_last_src(const sockaddr_store_t &src) {
++        return src;
++    }
++
+     class ServerMessageHandlerCallback {
+         Server<IoType, SwitchActivityInfo, SwitchCalcGaps> &m_server;
+         int m_ifd;
+         struct sockaddr_store_t &m_recvfrom_addr;
+         socklen_t m_recvfrom_len;
+         fds_data *m_fds_ifd;
+-
+     public:
+         inline ServerMessageHandlerCallback(Server<IoType, SwitchActivityInfo, SwitchCalcGaps> &server,
+                 int ifd, struct sockaddr_store_t &recvfrom_addr, socklen_t recvfrom_len,
+@@ -109,8 +134,7 @@ private:
+         }
+     };
+ 
+-    // protected:
+-public:
++ public:
+     //------------------------------------------------------------------------------
+     Server(int _fd_min, int _fd_max, int _fd_num);
+     virtual ~Server();
+@@ -121,25 +145,40 @@ public:
+     ** receive from and send to selected socket
+     */
+     template <class InputHandler>
+-    /*inline*/ bool server_receive_then_send(int ifd);
++    /*inline*/ bool server_receive_then_send_impl(int ifd);
+ 
+-    inline bool server_receive_then_send(int ifd)
+-    {
+ #ifdef USING_VMA_EXTRA_API // VMA
+-        if (SOCKETXTREME == g_pApp->m_const_params.fd_handler_type && g_vma_api) {
+-            return server_receive_then_send<SocketXtremeInputHandler>(ifd);
+-        }
++    template <typename T = IoType>
++    inline std::enable_if_t<is_vma_bufftype<T>::value, bool>
++    server_receive_then_send(int ifd) {
++        return server_receive_then_send_impl<VmaSocketXtremeInputHandler>(ifd);
++    }
++#endif
+ 
++#ifdef USING_XLIO_EXTRA_API // XLIO
++    template <typename T = IoType>
++    inline std::enable_if_t<is_xlio_bufftype<T>::value, bool>
++    server_receive_then_send(int ifd) {
++        return server_receive_then_send_impl<XlioSocketXtremeInputHandler>(ifd);
++    }
++#endif
++
++    template <typename T = IoType>
++    inline std::enable_if_t<!(
++        is_vma_bufftype<T>{} ||
++        is_xlio_bufftype<T>{}), bool>
++    server_receive_then_send(int ifd) {
++#ifdef USING_VMA_EXTRA_API // VMA
+         if (g_pApp->m_const_params.is_zcopyread && g_vma_api) {
+-            return server_receive_then_send<VmaZCopyReadInputHandler>(ifd);
++            return server_receive_then_send_impl<VmaZCopyReadInputHandler>(ifd);
+         }
+ #endif // USING_VMA_EXTRA_API
+ #ifdef USING_XLIO_EXTRA_API // XLIO
+         if (g_pApp->m_const_params.is_zcopyread && g_xlio_api) {
+-            return server_receive_then_send<XlioZCopyReadInputHandler>(ifd);
++            return server_receive_then_send_impl<XlioZCopyReadInputHandler>(ifd);
+         }
+ #endif // USING_XLIO_EXTRA_API
+-        return server_receive_then_send<RecvFromInputHandler>(ifd);
++        return server_receive_then_send_impl<RecvFromInputHandler>(ifd);
+     }
+ 
+     /*inline*/ bool handle_message(int ifd, struct sockaddr_store_t &recvfrom_addr,
+@@ -191,6 +230,8 @@ void close_ifd(int fd, int ifd, fds_data *l_fds_ifd) {
+             g_xlio_api->recvfrom_zcopy_free_packets(fd, xlio_pkts->pkts, xlio_pkts->n_packet_num);
+             z_ptr->m_pkts = NULL;
+         }
++
++        g_xlio_api->register_recv_callback(fd, NULL, NULL);
+     }
+ #endif // USING_XLIO_EXTRA_API
+ 
+@@ -213,13 +254,14 @@ void close_ifd(int fd, int ifd, fds_data *l_fds_ifd) {
+         }
+     }
+ }
++
+ //------------------------------------------------------------------------------
+ /*
+ ** receive from and send to selected socket
+ */
+ template <class IoType, class SwitchActivityInfo, class SwitchCalcGaps>
+ template <class InputHandler>
+-inline bool Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_receive_then_send(int ifd) {
++inline bool Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_receive_then_send_impl(int ifd) {
+     struct sockaddr_store_t recvfrom_addr;
+     socklen_t recvfrom_len = sizeof(recvfrom_addr);
+     static const bool do_update = true;
+@@ -230,7 +272,9 @@ inline bool Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_receive_t
+         return (do_update);
+     }
+ 
+-    InputHandler input_handler(m_pMsgReply, l_fds_ifd->recv);
++    InputHandler input_handler(
++        input_handler_helper<InputHandler,decltype(m_ioHandler)>::create_input_handler(
++            m_pMsgReply, l_fds_ifd->recv, m_ioHandler));
+     ret = input_handler.receive_pending_data(ifd, reinterpret_cast<sockaddr *>(&recvfrom_addr), recvfrom_len);
+     if (unlikely(ret <= 0)) {
+         input_handler.cleanup();
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 194d1f6..3183719 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -268,8 +268,8 @@ static const AOPT_DESC common_opt_desc[] = {
+       "Time to wait before sending warm up messages (seconds)." },
+ #ifndef __windows__
+     { OPT_ZCOPYREAD,                                      AOPT_NOARG,
+-      aopt_set_literal(0),                                aopt_set_string("zcopyread", "vmazcopyread"),
+-      "Use VMA's zero copy reads API (See VMA's readme)." },
++      aopt_set_literal(0),                                aopt_set_string("zcopyread"),
++      "Use RX zero copy API (See VMA/XLIO readme)." },
+     { OPT_DAEMONIZE, AOPT_NOARG, aopt_set_literal(0), aopt_set_string("daemonize"), "Run as "
+                                                                                     "daemon." },
+ #if !defined(__arm__) || defined(__aarch64__)
+@@ -1527,8 +1527,8 @@ static int proc_mode_server(int id, int argc, const char **argv) {
+         { OPT_RXFILTERCB,
+           AOPT_NOARG,
+           aopt_set_literal(0),
+-          aopt_set_string("rxfiltercb", "vmarxfiltercb"),
+-          "Use VMA's receive path message filter callback API (See VMA's readme)." },
++          aopt_set_string("rxfiltercb"),
++          "Use extra API receive path message filter callback API (See VMA/XLIO readme)." },
+ #endif
+         { OPT_FORCE_UC_REPLY,                  AOPT_NOARG,
+           aopt_set_literal(0),                 aopt_set_string("force-unicast-reply"),
+@@ -2519,29 +2519,36 @@ void set_defaults() {
+ }
+ 
+ //------------------------------------------------------------------------------
+-#ifdef USING_VMA_EXTRA_API // Only for VMA callback-extra-api
++#ifdef USING_EXTRA_API // Only for callback-extra-api
++template <class T> // T is vma_info_t | xlio_info_t
+ class CallbackMessageHandler {
+     int m_fd;
+     fds_data *m_fds_ifd;
+-    struct vma_info_t *m_vma_info;
++    T *m_extra_info;
+ 
+ public:
+-    inline CallbackMessageHandler(int fd, fds_data *l_fds_ifd, struct vma_info_t *vma_info) :
++    inline CallbackMessageHandler(int fd, fds_data *l_fds_ifd, T *extra_info) :
+         m_fd(fd),
+         m_fds_ifd(l_fds_ifd),
+-        m_vma_info(vma_info)
++        m_extra_info(extra_info)
+     {}
+ 
+     inline bool handle_message();
+ };
+ 
+-vma_recv_callback_retval_t myapp_vma_recv_pkt_filter_callback(int fd, size_t iov_sz,
+-                                                              struct iovec iov[],
+-                                                              struct vma_info_t *vma_info,
+-                                                              void *context) {
++// T is vma_info_t | xlio_info_t
++// RT is vma_recv_callback_retval_t | xlio_recv_callback_retval_t
++// Pkts is vma_packets_t | xlio_recvfrom_zcopy_packets_t
++// RTValRecv is VMA_PACKET_RECV | XLIO_PACKET_RECV
++// RTValDrop is VMA_PACKET_DROP | XLIO_PACKET_DROP
++template <class T, typename RT, typename Pkts, RT RTValRecv, RT RTValDrop>
++RT myapp_recv_pkt_filter_callback(int fd, size_t iov_sz,
++                                  struct iovec iov[],
++                                  T *extra_info,
++                                  void *context) {
+ #ifdef ST_TEST
+     if (st1) {
+-        log_msg("DEBUG: ST_TEST - myapp_vma_recv_pkt_filter_callback fd=%d", fd);
++        log_msg("DEBUG: ST_TEST - myapp_recv_pkt_filter_callback fd=%d", fd);
+         close(st1);
+         close(st2);
+         st1 = st2 = 0;
+@@ -2549,43 +2556,64 @@ vma_recv_callback_retval_t myapp_vma_recv_pkt_filter_callback(int fd, size_t iov
+ #endif
+ 
+     // Check info structure version
+-    if (vma_info->struct_sz < sizeof(struct vma_info_t)) {
+-        log_msg("VMA's info struct is not something we can handle so un-register the application's "
++    if (extra_info->struct_sz < sizeof(T)) {
++        log_msg("Extra info struct is not something we can handle so un-register the application's "
+                 "callback function");
+-        g_vma_api->register_recv_callback(fd, NULL, NULL);
+-        return VMA_PACKET_RECV;
++        if (g_vma_api) {
++#ifdef USING_VMA_EXTRA_API // Only for VMA callback-extra-api
++            g_vma_api->register_recv_callback(fd, NULL, NULL);
++#endif // USING_VMA_EXTRA_API
++        } else {
++#ifdef USING_XLIO_EXTRA_API // Only for XLIO callback-extra-api
++            g_xlio_api->register_recv_callback(fd, NULL, NULL);
++#endif // USING_XLIO_EXTRA_API
++        }
++        return RTValRecv;
+     }
+ 
+     // If there is data in local buffer, then push new packet in TCP queue.Otherwise handle received
+     // packet inside callback.
+     if (g_zeroCopyData[fd] && g_zeroCopyData[fd]->m_pkts &&
+-        reinterpret_cast<vma_packets_t *>(g_zeroCopyData[fd]->m_pkts)->n_packet_num > 0) {
+-        return VMA_PACKET_RECV;
++        reinterpret_cast<Pkts *>(g_zeroCopyData[fd]->m_pkts)->n_packet_num > 0) {
++        return RTValRecv;
+     }
+ 
+     struct fds_data *l_fds_ifd;
+ 
+     l_fds_ifd = g_fds_array[fd];
+     if (unlikely(!l_fds_ifd)) {
+-        return VMA_PACKET_RECV;
++        return RTValRecv;
+     }
+     Message *msgReply = l_fds_ifd->p_msg;
+     SocketRecvData &recv_data = l_fds_ifd->recv;
+ 
+-    CallbackMessageHandler handler(fd, l_fds_ifd, vma_info);
++    CallbackMessageHandler<T> handler(fd, l_fds_ifd, extra_info);
+     MessageParser<BufferAccumulation> parser(msgReply);
+     for (size_t i = 0; i < iov_sz; ++i) {
+         bool ok = parser.process_buffer(handler, recv_data, (uint8_t *)iov[i].iov_base,
+                 (int)iov[i].iov_len);
+         if (unlikely(!ok)) {
+-            return VMA_PACKET_RECV;
++            return RTValRecv;
+         }
+     }
+ 
+-    return VMA_PACKET_DROP;
++    return RTValDrop;
+ }
+ 
+-inline bool CallbackMessageHandler::handle_message()
++#ifdef USING_VMA_EXTRA_API // Only for VMA callback-extra-api
++#define myapp_vma_recv_pkt_filter_callback \
++    myapp_recv_pkt_filter_callback<vma_info_t, vma_recv_callback_retval_t, vma_packets_t, \
++                                   VMA_PACKET_RECV, VMA_PACKET_DROP>
++#endif // USING_VMA_EXTRA_API
++
++#ifdef USING_XLIO_EXTRA_API // Only for XLIO callback-extra-api
++#define myapp_xlio_recv_pkt_filter_callback \
++    myapp_recv_pkt_filter_callback<xlio_info_t, xlio_recv_callback_retval_t, xlio_recvfrom_zcopy_packets_t, \
++                                   XLIO_PACKET_RECV, XLIO_PACKET_DROP>
++#endif // USING_XLIO_EXTRA_API
++
++template <class T>
++inline bool CallbackMessageHandler<T>::handle_message()
+ {
+     struct sockaddr_store_t sendto_addr;
+     socklen_t sendto_len;
+@@ -2626,10 +2654,10 @@ inline bool CallbackMessageHandler::handle_message()
+             /* get source addr to reply. memcpy is not used to improve performance */
+             //TODO: update after IPv6 will be supported in libvma
+             sendto_len = sizeof(sockaddr_in);
+-            std::memcpy(&sendto_addr, m_vma_info->src, sendto_len);
++            std::memcpy(&sendto_addr, m_extra_info->src, sendto_len);
+         } else if (m_fds_ifd->is_multicast) {
+             /* always send to the same port recved from */
+-            sockaddr_set_portn(sendto_addr, sockaddr_get_portn((sockaddr_store_t &)*m_vma_info->src));
++            sockaddr_set_portn(sendto_addr, sockaddr_get_portn((sockaddr_store_t &)*m_extra_info->src));
+         }
+         int length = msgReply->getLength();
+         msgReply->setHeaderToNetwork();
+@@ -3050,18 +3078,26 @@ int prepare_socket(int fd, struct fds_data *p_data)
+ #ifdef ST_TEST
+     if (!stTest)
+ #endif
+-#ifdef USING_VMA_EXTRA_API
+-        if (!rc && (s_user_params.is_rxfiltercb && g_vma_api)) { // XLIO does not support callback-extra-api
++        if (!rc && (s_user_params.is_rxfiltercb && (g_vma_api || g_xlio_api))) {
+             // Try to register application with VMA's special receive notification callback logic
+-            if (g_vma_api->register_recv_callback(fd, myapp_vma_recv_pkt_filter_callback, NULL) <
+-                0) {
+-                log_err("vma_api->register_recv_callback failed. Try running without option "
+-                        "'rxfiltercb'/'vmarxfiltercb'");
++            int rc = -1;
++            if (g_vma_api) {
++#ifdef USING_VMA_EXTRA_API // VMA callback-extra-api only
++                rc = g_vma_api->register_recv_callback(fd, myapp_vma_recv_pkt_filter_callback, NULL);
++#endif // USING_VMA_EXTRA_API
+             } else {
+-                log_dbg("vma_api->register_recv_callback successful registered");
++#ifdef USING_XLIO_EXTRA_API // XLIO callback-extra-api only
++                rc = g_xlio_api->register_recv_callback(fd, myapp_xlio_recv_pkt_filter_callback, NULL);
++#endif // USING_XLIO_EXTRA_API
++            }
++
++            if (rc < 0) {
++                log_err("register_recv_callback failed. Try running without option 'rxfiltercb'");
++            } else {
++                log_dbg("register_recv_callback successful registered");
+             }
+         } else
+-#endif // USING_VMA_EXTRA_API
++
+         if (!rc && (s_user_params.is_zcopyread && (g_vma_api || g_xlio_api))) {
+             g_zeroCopyData[fd] = new ZeroCopyData();
+             g_zeroCopyData[fd]->allocate();
+@@ -3072,7 +3108,7 @@ int prepare_socket(int fd, struct fds_data *p_data)
+                 : (int)INVALID_SOCKET); // TODO: use SOCKET all over the way and avoid this cast
+ }
+ 
+-#ifdef USING_VMA_EXTRA_API
++#ifdef USING_EXTRA_API
+ //------------------------------------------------------------------------------
+ static bool is_unspec_addr(const sockaddr_store_t &addr)
+ {
+@@ -3084,7 +3120,7 @@ static bool is_unspec_addr(const sockaddr_store_t &addr)
+     }
+     return true;
+ }
+-#endif // USING_VMA_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+ //------------------------------------------------------------------------------
+ /* get IP:port pairs from the file and initialize the list */
+@@ -3239,7 +3275,7 @@ static int set_sockets_from_feedfile(const char *feedfile_name) {
+         } else {
+             sock_type = SOCK_DGRAM;
+         }
+-#ifdef USING_VMA_EXTRA_API
++#ifdef USING_EXTRA_API
+         if (sock_type == SOCK_DGRAM && s_user_params.mode == MODE_CLIENT) {
+             if (s_user_params.fd_handler_type == SOCKETXTREME &&
+                 is_unspec_addr(s_user_params.client_bind_info)) {
+@@ -3249,7 +3285,7 @@ static int set_sockets_from_feedfile(const char *feedfile_name) {
+                 break;
+             }
+         }
+-#endif
++#endif // USING_EXTRA_API
+ 
+         std::unique_ptr<fds_data> tmp{ new fds_data };
+ 
+@@ -3511,16 +3547,9 @@ int bringup(const int *p_daemonize) {
+ #ifdef USING_VMA_EXTRA_API
+         g_vma_api = vma_get_api();
+ #endif // USING_VMA_EXTRA_API
+-        if (!g_vma_api) { // Try VMA Extra API
+-            // Callback and Socketxtreme APIs are supported only by VMA
+-            if (s_user_params.is_rxfiltercb || s_user_params.fd_handler_type == SOCKETXTREME) {
+-                exit_with_err("VMA Extra API is not available", SOCKPERF_ERR_FATAL);
+-            }
+-        } else {
++        if (g_vma_api) { // Try VMA Extra API
+             log_msg("VMA Extra API is in use");
+-        }
+-
+-        if (!g_vma_api) { // Try XLIO
++        } else { // Try XLIO
+ #ifdef USING_XLIO_EXTRA_API
+             g_xlio_api = xlio_get_api();
+ #endif // USING_XLIO_EXTRA_API
+-- 
+2.43.0
+

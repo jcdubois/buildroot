@@ -1,0 +1,44 @@
+From f035bf0bee0edb80bd67a8cf163528e070a142d5 Mon Sep 17 00:00:00 2001
+From: Wonsup Yoon <pusnow@kaist.ac.kr>
+Date: Fri, 20 Jan 2023 22:55:35 +0900
+Subject: [PATCH 03/33] Change version file's name to sockperf-version
+
+---
+ Makefile.am                 | 2 +-
+ build/versioning.sh         | 2 +-
+ version => sockperf-version | 0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename version => sockperf-version (100%)
+
+diff --git a/Makefile.am b/Makefile.am
+index 809d386..e98a4c3 100755
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -56,7 +56,7 @@ dist_doc_DATA = \
+ 	README.md \
+ 	authors \
+ 	news \
+-	version \
++	sockperf-version \
+ 	copying
+ 
+ EXTRA_DIST = \
+diff --git a/build/versioning.sh b/build/versioning.sh
+index d4b0a06..c015ca7 100755
+--- a/build/versioning.sh
++++ b/build/versioning.sh
+@@ -1,6 +1,6 @@
+ #!/bin/bash -e
+ 
+-VERSION=`cat version | tr -d '\n'`
++VERSION=`cat sockperf-version | tr -d '\n'`
+ GIT_REF=`git rev-parse HEAD 2> /dev/null || echo "no.git"`
+ x=`git describe --long --abbrev=12 --dirty 2> /dev/null || echo ""`
+ if [ -n "$x" ]; then x=`echo $x | sed -e 's/-g/.git/' -e 's/-dirty/.dirty/' | sed s/.*-//`; else  x="no.git"; fi
+diff --git a/version b/sockperf-version
+similarity index 100%
+rename from version
+rename to sockperf-version
+-- 
+2.43.0
+

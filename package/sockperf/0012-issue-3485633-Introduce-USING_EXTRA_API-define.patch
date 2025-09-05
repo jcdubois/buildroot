@@ -1,0 +1,186 @@
+From 1de18f818c2fc6771f752f8469e5c505778f582d Mon Sep 17 00:00:00 2001
+From: Alexander Grissik <agrissik@nvidia.com>
+Date: Tue, 30 May 2023 10:28:04 +0300
+Subject: [PATCH 12/33] issue: 3485633 Introduce USING_EXTRA_API define
+
+Signed-off-by: Alexander Grissik <agrissik@nvidia.com>
+---
+ src/defs.cpp         |  4 ++--
+ src/defs.h           | 16 ++++++++++------
+ src/input_handlers.h |  4 ++--
+ src/iohandlers.h     |  2 +-
+ src/sockperf.cpp     | 12 ++++++------
+ 5 files changed, 21 insertions(+), 17 deletions(-)
+
+diff --git a/src/defs.cpp b/src/defs.cpp
+index aa1a77b..fb085eb 100644
+--- a/src/defs.cpp
++++ b/src/defs.cpp
+@@ -41,7 +41,7 @@ TicksTime g_cycleStartTime;
+ 
+ debug_level_t g_debug_level = LOG_LVL_INFO;
+ 
+-#if defined(USING_VMA_EXTRA_API) || defined (USING_XLIO_EXTRA_API)
++#ifdef USING_EXTRA_API
+ #ifdef USING_VMA_EXTRA_API // VMA
+ struct vma_buff_t *g_vma_buff = NULL;
+ struct vma_completion_t *g_vma_comps;
+@@ -56,7 +56,7 @@ ZeroCopyData::~ZeroCopyData() {
+ }
+ 
+ zeroCopyMap g_zeroCopyData;
+-#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+ uint32_t MPS_MAX = MPS_MAX_UL; // will be overwrite at runtime in case of ping-pong test
+ PacketTimes *g_pPacketTimes = NULL;
+diff --git a/src/defs.h b/src/defs.h
+index 8565f1b..faeaa1e 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -107,6 +107,10 @@ typedef unsigned short int sa_family_t;
+ #include "playback.h"
+ #include "ip_address.h"
+ 
++#if defined(USING_VMA_EXTRA_API) || defined (USING_XLIO_EXTRA_API)
++#define USING_EXTRA_API
++#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++
+ #if !defined(__windows__) && !defined(__FreeBSD__) && !defined(__APPLE__)
+ #include "vma-xlio-redirect.h"
+ #ifdef USING_VMA_EXTRA_API // VMA
+@@ -186,9 +190,9 @@ const uint32_t TEST_FIRST_CONNECTION_FIRST_PACKET_TTL_THRESHOLD_MSEC = 50;
+ #define DUMMY_PORT 57341
+ #define MAX_ACTIVE_FD_NUM                                                                          \
+     max_fds_num /* maximum number of active connection to the single TCP addr:port */
+-#ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+-#define MAX_VMA_COMPS 1024 /* maximum size for the VMA completions array for VMA Poll */
+-#endif // USING_VMA_EXTRA_API
++#ifdef USING_EXTRA_API // For VMA socketxtreme Only
++#define MAX_SOCKETXTREME_COMPS 1024 /* maximum size for socketxtreme poll completions array */
++#endif // USING_EXTRA_API
+ 
+ #ifndef MAX_PATH_LENGTH
+ #define MAX_PATH_LENGTH 1024
+@@ -498,7 +502,7 @@ extern TicksTime g_cycleStartTime;
+ 
+ extern debug_level_t g_debug_level;
+ 
+-#if defined(USING_VMA_EXTRA_API) || defined(USING_XLIO_EXTRA_API)
++#ifdef USING_EXTRA_API
+ #ifdef USING_VMA_EXTRA_API // VMA
+ extern struct vma_buff_t *g_vma_buff;
+ extern struct vma_completion_t *g_vma_comps;
+@@ -514,7 +518,7 @@ public:
+ // map from fd to zeroCopyData
+ typedef std::map<int, ZeroCopyData *> zeroCopyMap;
+ extern zeroCopyMap g_zeroCopyData;
+-#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+ class Message;
+ 
+@@ -649,7 +653,7 @@ struct equal_to<struct sockaddr_store_t> :
+ 
+ #ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+ struct vma_ring_comps {
+-    vma_completion_t vma_comp_list[MAX_VMA_COMPS];
++    vma_completion_t vma_comp_list[MAX_SOCKETXTREME_COMPS];
+     int vma_comp_list_size;
+     bool is_freed;
+ };
+diff --git a/src/input_handlers.h b/src/input_handlers.h
+index b2c9d75..714fcc3 100644
+--- a/src/input_handlers.h
++++ b/src/input_handlers.h
+@@ -119,7 +119,7 @@ public:
+     }
+ };
+ 
+-#if defined(USING_VMA_EXTRA_API) || defined(USING_XLIO_EXTRA_API)
++#ifdef USING_EXTRA_API
+ typedef int(* recvfrom_zcopy_func_t)(int __fd, void *__buf, size_t __nbytes, int *__flags,
+                                      struct sockaddr *__from, socklen_t *__fromlen);
+ 
+@@ -311,6 +311,6 @@ public:
+ };
+ #endif // USING_XLIO_EXTRA_API
+ 
+-#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+ #endif // INPUT_HANDLERS_H_
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 519ea28..25d0b09 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -512,7 +512,7 @@ public:
+             }
+             m_rings_vma_comps_map_itr->second->vma_comp_list_size = g_vma_api->socketxtreme_poll(
+                 ring_fd, (vma_completion_t *)(&m_rings_vma_comps_map_itr->second->vma_comp_list),
+-                MAX_VMA_COMPS, 0);
++                MAX_SOCKETXTREME_COMPS, 0);
+ 
+             if (m_rings_vma_comps_map_itr->second->vma_comp_list_size > 0) {
+                 m_vma_comps_queue.push(ring_fd);
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 6173882..194d1f6 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -2424,7 +2424,7 @@ void cleanup() {
+     if (s_user_params.select_timeout) {
+         FREE(s_user_params.select_timeout);
+     }
+-#if defined(USING_VMA_EXTRA_API) || defined(USING_XLIO_EXTRA_API)
++#ifdef USING_EXTRA_API
+     if ((g_vma_api || g_xlio_api) && s_user_params.is_zcopyread) {
+         zeroCopyMap::iterator it;
+         while ((it = g_zeroCopyData.begin()) != g_zeroCopyData.end()) {
+@@ -2432,7 +2432,7 @@ void cleanup() {
+             g_zeroCopyData.erase(it);
+         }
+     }
+-#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+     if (g_fds_array) {
+         FREE(g_fds_array);
+@@ -3046,7 +3046,7 @@ int prepare_socket(int fd, struct fds_data *p_data)
+         rc = sock_set_tos(fd);
+     }
+ 
+-#if defined(USING_VMA_EXTRA_API) || defined(USING_XLIO_EXTRA_API)
++#ifdef USING_EXTRA_API
+ #ifdef ST_TEST
+     if (!stTest)
+ #endif
+@@ -3066,7 +3066,7 @@ int prepare_socket(int fd, struct fds_data *p_data)
+             g_zeroCopyData[fd] = new ZeroCopyData();
+             g_zeroCopyData[fd]->allocate();
+         }
+-#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+     return (!rc ? fd
+                 : (int)INVALID_SOCKET); // TODO: use SOCKET all over the way and avoid this cast
+@@ -3504,7 +3504,7 @@ int bringup(const int *p_daemonize) {
+     /* Setup VMA */
+     int _vma_pkts_desc_size = 0;
+ 
+-#if defined(USING_VMA_EXTRA_API) || defined(USING_XLIO_EXTRA_API)
++#ifdef USING_EXTRA_API
+     if (!rc && (s_user_params.is_rxfiltercb || s_user_params.is_zcopyread ||
+                 s_user_params.fd_handler_type == SOCKETXTREME)) {
+         // Get VMA extended API
+@@ -3552,7 +3552,7 @@ int bringup(const int *p_daemonize) {
+         errno = EPERM;
+         exit_with_err("Please compile with VMA or XLIO Extra API to use these options", SOCKPERF_ERR_FATAL);
+     }
+-#endif // USING_VMA_EXTRA_API || USING_XLIO_EXTRA_API
++#endif // USING_EXTRA_API
+ 
+ 
+ #if defined(DEFINED_TLS)
+-- 
+2.43.0
+

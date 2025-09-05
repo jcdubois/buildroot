@@ -1,0 +1,31 @@
+From feecc8af34251cb6c3a7b9d4883cdacd64d540d5 Mon Sep 17 00:00:00 2001
+From: Igor Ivanov <igori@nvidia.com>
+Date: Tue, 7 Nov 2023 18:07:55 +0200
+Subject: [PATCH 19/33] issue: 3663275 Fix C++17 compilation warning
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+ISO C++17 does not allow ‘register’ storage class specifier [-Wregister]
+
+Signed-off-by: Igor Ivanov <igori@nvidia.com>
+---
+ src/ticks_os.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/ticks_os.h b/src/ticks_os.h
+index af00de5..391a692 100644
+--- a/src/ticks_os.h
++++ b/src/ticks_os.h
+@@ -84,7 +84,7 @@ inline ticks_t os_gettimeoftsc() {
+     lp.QuadPart = (LONGLONG)((lp.QuadPart) / (PCFreq));
+     return (ticks_t)(lp.QuadPart);
+ #else
+-    register uint32_t upper_32, lower_32;
++    uint32_t upper_32, lower_32;
+ 
+ #if defined(__powerpc64__)
+     unsigned long long ret;
+-- 
+2.43.0
+

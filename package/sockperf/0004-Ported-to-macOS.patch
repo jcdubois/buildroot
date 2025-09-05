@@ -1,0 +1,455 @@
+From 0630f9c9bca229d0582447f0e8b55194e52c5c10 Mon Sep 17 00:00:00 2001
+From: Wonsup Yoon <pusnow@kaist.ac.kr>
+Date: Fri, 20 Jan 2023 22:57:10 +0900
+Subject: [PATCH 04/33] Ported to macOS
+
+---
+ src/client.cpp          | 10 +++++-----
+ src/common.cpp          |  2 +-
+ src/common.h            |  6 +++---
+ src/defs.h              | 10 +++++-----
+ src/iohandlers.cpp      |  4 ++--
+ src/iohandlers.h        |  2 +-
+ src/ip_address.h        |  5 +++++
+ src/message.cpp         |  2 +-
+ src/os_abstract.cpp     | 12 ++++++++++++
+ src/os_abstract.h       | 14 ++++++++++++++
+ src/server.cpp          |  4 ++--
+ src/sockperf.cpp        | 31 +++++++++++++++----------------
+ src/vma-xlio-redirect.h |  3 +++
+ 13 files changed, 69 insertions(+), 36 deletions(-)
+
+diff --git a/src/client.cpp b/src/client.cpp
+index ff98a32..bc57eb2 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -879,14 +879,14 @@ int Client<IoType, SwitchDataIntegrity, SwitchActivityInfo, SwitchCycleDuration,
+             if (!(data && (data->active_fd_list))) continue;
+ 
+             const sockaddr_store_t *p_client_bind_addr = &g_pApp->m_const_params.client_bind_info;
+-            if (p_client_bind_addr->ss_family != AF_UNSPEC) {
++            if (p_client_bind_addr->addr.sa_family != AF_UNSPEC) {
+                 socklen_t client_bind_addr_len = g_pApp->m_const_params.client_bind_info_len;
+                 std::string hostport = sockaddr_to_hostport(p_client_bind_addr);
+-#ifdef __linux__
++#if defined(__linux__) || defined(__APPLE__)
+                 struct sockaddr_store_t unix_addr;
+                 socklen_t unix_addr_len;
+ #endif
+-                if (p_client_bind_addr->ss_family == AF_UNIX && g_pApp->m_const_params.sock_type == SOCK_DGRAM) { // Need to bind localy
++                if (p_client_bind_addr->addr.sa_family == AF_UNIX && g_pApp->m_const_params.sock_type == SOCK_DGRAM) { // Need to bind localy
+ #ifdef __windows__
+                     log_err("AF_UNIX with DGRAM isn't supported in windows");
+                     rc = SOCKPERF_ERR_SOCKET;
+@@ -903,7 +903,7 @@ int Client<IoType, SwitchDataIntegrity, SwitchActivityInfo, SwitchCycleDuration,
+                             memset(unix_addr.addr_un.sun_path, 0, sizeof(unix_addr.addr_un.sun_path));
+                             memcpy(unix_addr.addr_un.sun_path, sun_path.c_str(), sun_path.length());
+                             unix_addr_len = sizeof(struct sockaddr_un);
+-                            unix_addr.ss_family = AF_UNIX;
++                            unix_addr.addr.sa_family = AF_UNIX;
+                             hostport = sun_path;
+                         }
+                         p_client_bind_addr = &unix_addr;
+@@ -1266,7 +1266,7 @@ void client_handler(handler_info *p_info) {
+             client_handler<IoPoll>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+             break;
+         }
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__)
+         case EPOLL: {
+             client_handler<IoEpoll>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+             break;
+diff --git a/src/common.cpp b/src/common.cpp
+index 5871153..babd39f 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -73,7 +73,7 @@ std::string sockaddr_to_hostport(const struct sockaddr *addr)
+ //------------------------------------------------------------------------------
+ bool is_multicast_addr(const sockaddr_store_t &addr)
+ {
+-    switch (addr.ss_family) {
++    switch (addr.addr.sa_family) {
+     case AF_INET:
+         return IN_MULTICAST(ntohl(reinterpret_cast<const sockaddr_in &>(addr).sin_addr.s_addr));
+     case AF_INET6:
+diff --git a/src/common.h b/src/common.h
+index 11652a0..7a4da90 100644
+--- a/src/common.h
++++ b/src/common.h
+@@ -170,7 +170,7 @@ int sock_set_rate_limit(int fd, uint32_t rate_limit);
+  */
+ static inline uint16_t sockaddr_get_portn(const sockaddr_store_t &addr)
+ {
+-    switch (addr.ss_family) {
++    switch (addr.addr.sa_family) {
+     case AF_INET:
+         return reinterpret_cast<const sockaddr_in &>(addr).sin_port;
+     case AF_INET6:
+@@ -182,7 +182,7 @@ static inline uint16_t sockaddr_get_portn(const sockaddr_store_t &addr)
+  */
+ static inline void sockaddr_set_portn(sockaddr_store_t &addr, uint16_t port)
+ {
+-    switch (addr.ss_family) {
++    switch (addr.addr.sa_family) {
+     case AF_INET:
+         reinterpret_cast<sockaddr_in &>(addr).sin_port = port;
+     case AF_INET6:
+@@ -192,7 +192,7 @@ static inline void sockaddr_set_portn(sockaddr_store_t &addr, uint16_t port)
+ 
+ static inline void copy_relevant_sockaddr_params(sockaddr_store_t &dst_addr, const sockaddr_store_t &src_addr)
+ {
+-    switch (src_addr.ss_family) {
++    switch (src_addr.addr.sa_family) {
+     case AF_INET:
+         dst_addr.addr4 = src_addr.addr4;
+     case AF_INET6:
+diff --git a/src/defs.h b/src/defs.h
+index 2335e8c..fee7180 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -196,7 +196,7 @@ const uint32_t TEST_FIRST_CONNECTION_FIRST_PACKET_TTL_THRESHOLD_MSEC = 50;
+         "^[UuTt]:([A-Za-z]:[\\\\/].*)[\r\n]*"
+ #define RESOLVE_ADDR_FORMAT_SOCKET                                                                 \
+         "[A-Za-z]:[\\\\/].*"
+-#elif __linux__
++#elif defined(__linux__) || defined(__APPLE__) 
+ #define UNIX_DOMAIN_SOCKET_FORMAT_REG_EXP                                                          \
+         "^[UuTt]:(/.+)[\r\n]"
+ #define RESOLVE_ADDR_FORMAT_SOCKET                                                                 \
+@@ -532,7 +532,7 @@ struct SocketRecvData {
+ // big enough to store sockaddr_in and sockaddr_in6
+ struct sockaddr_store_t {
+     union {
+-        sa_family_t ss_family;
++        sockaddr addr;
+         sockaddr_in addr4;
+         sockaddr_in6 addr6;
+         sockaddr_un addr_un;
+@@ -595,7 +595,7 @@ template <> struct hash<struct sockaddr_store_t> : public std::unary_function<st
+     int operator()(struct sockaddr_store_t const &key) const {
+         // XOR "a.b" part of "a.b.c.d" address with 16bit port; leave "c.d" part untouched for
+         // maximum hashing
+-        switch (key.ss_family) {
++        switch (key.addr.sa_family) {
+         case AF_INET: {
+             const sockaddr_in &k = reinterpret_cast<const sockaddr_in &>(key);
+             return k.sin_addr.s_addr ^ (k.sin_port << 16);
+@@ -616,10 +616,10 @@ struct equal_to<struct sockaddr_store_t> :
+         public std::binary_function<struct sockaddr_store_t,
+                 struct sockaddr_store_t, bool> {
+     bool operator()(struct sockaddr_store_t const &key1, struct sockaddr_store_t const &key2) const {
+-        if (key1.ss_family != key2.ss_family) {
++        if (key1.addr.sa_family != key2.addr.sa_family) {
+             return false;
+         }
+-        switch (key1.ss_family) {
++        switch (key1.addr.sa_family) {
+         case AF_INET: {
+             const sockaddr_in &k1 = reinterpret_cast<const sockaddr_in &>(key1);
+             const sockaddr_in &k2 = reinterpret_cast<const sockaddr_in &>(key2);
+diff --git a/src/iohandlers.cpp b/src/iohandlers.cpp
+index 704eae9..57e9a57 100644
+--- a/src/iohandlers.cpp
++++ b/src/iohandlers.cpp
+@@ -36,7 +36,7 @@ static void print_addresses(const fds_data *data, int &list_count)
+         getnameinfo(reinterpret_cast<const sockaddr *>(&data->server_addr), data->server_addr_len,
+                 hbuf, sizeof(hbuf), pbuf, sizeof(pbuf),
+                 NI_NUMERICHOST | NI_NUMERICSERV);
+-        switch (data->server_addr.ss_family) {
++        switch (data->server_addr.addr.sa_family) {
+             case AF_UNIX:
+                 printf("[%2d] ADDR = %s # %s\n", list_count++, data->server_addr.addr_un.sun_path, PRINT_PROTOCOL(data->sock_type));
+                 break;
+@@ -202,7 +202,7 @@ int IoPoll::prepareNetwork() {
+ 
+     return rc;
+ }
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__)
+ //==============================================================================
+ //------------------------------------------------------------------------------
+ IoEpoll::IoEpoll(int _fd_min, int _fd_max, int _fd_num)
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 0b1053e..592887c 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -302,7 +302,7 @@ private:
+     struct pollfd *mp_poll_fd_arr;
+ };
+ 
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__) 
+ //==============================================================================
+ class IoEpoll : public IoHandler {
+ public:
+diff --git a/src/ip_address.h b/src/ip_address.h
+index 635df4e..36a2e5d 100644
+--- a/src/ip_address.h
++++ b/src/ip_address.h
+@@ -38,6 +38,11 @@
+ #include <afunix.h>
+ typedef unsigned short int sa_family_t;
+ 
++#elif __APPLE__
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <sys/un.h>      /* definitions for UNIX domain sockets */
++
+ #elif __linux__
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+diff --git a/src/message.cpp b/src/message.cpp
+index 29b32d7..a44d86b 100644
+--- a/src/message.cpp
++++ b/src/message.cpp
+@@ -28,7 +28,7 @@
+ 
+ #include "message.h"
+ 
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__)
+ #include <malloc.h>
+ #endif
+ 
+diff --git a/src/os_abstract.cpp b/src/os_abstract.cpp
+index 8e1a507..1e4bd01 100644
+--- a/src/os_abstract.cpp
++++ b/src/os_abstract.cpp
+@@ -134,6 +134,8 @@ os_thread_t os_getthread(void) {
+     mythread.hThread = GetCurrentThread();
+ #elif __FreeBSD__
+     mythread.tid = pthread_self();
++#elif __APPLE__
++    mythread.tid = pthread_self();
+ #else
+     mythread.tid = syscall(__NR_gettid);
+ #endif
+@@ -358,6 +360,8 @@ bool os_sock_cleanup() {
+ void os_init_cpuset(os_cpuset_t *_mycpuset) {
+ #ifdef __windows__
+     _mycpuset->cpuset = 0;
++#elif __APPLE__
++    _mycpuset->cpuset.affinity_tag = THREAD_AFFINITY_TAG_NULL;
+ #else
+     CPU_ZERO(&_mycpuset->cpuset);
+ #endif
+@@ -368,6 +372,8 @@ void os_cpu_set(os_cpuset_t *_mycpuset, long _cpu_from, long _cpu_cur) {
+     while ((_cpu_from <= _cpu_cur)) {
+ #ifdef __windows__
+         _mycpuset->cpuset = (int)(1 << _cpu_from);
++#elif __APPLE__
++        _mycpuset->cpuset.affinity_tag = _cpu_from + 1;
+ #else
+         CPU_SET(_cpu_from, &(_mycpuset->cpuset));
+ #endif
+@@ -378,6 +384,9 @@ void os_cpu_set(os_cpuset_t *_mycpuset, long _cpu_from, long _cpu_cur) {
+ int os_set_affinity(const os_thread_t &thread, const os_cpuset_t &_mycpuset) {
+ #ifdef __windows__
+     if (0 == SetThreadAffinityMask(thread.hThread, _mycpuset.cpuset)) return -1;
++#elif __APPLE__
++    mach_port_t tid = pthread_mach_thread_np(thread.tid);
++    if (0 != thread_policy_set(tid, THREAD_AFFINITY_POLICY,  (thread_policy_t)&_mycpuset.cpuset, THREAD_AFFINITY_POLICY_COUNT)) return -1;
+ #else
+     // Can't use thread.tid since it's syscall and not pthread_t
+     if (0 != pthread_setaffinity_np(pthread_self(), sizeof(os_cpuset_t), &(_mycpuset.cpuset)))
+@@ -398,6 +407,9 @@ int os_get_max_active_fds_num() {
+             return 1024; // try the common default
+         }
+         max_active_fd_num = (int)curr_limits.rlim_max;
++        if (max_active_fd_num == -1){
++            max_active_fd_num = 1024; // try the common default
++        }
+     }
+     return max_active_fd_num;
+ #endif
+diff --git a/src/os_abstract.h b/src/os_abstract.h
+index d3f9395..1371ad4 100644
+--- a/src/os_abstract.h
++++ b/src/os_abstract.h
+@@ -120,6 +120,18 @@ void *win_set_timer(void *p_timer);
+ #define htonll htonl
+ #define ntohll ntohl
+ 
++/***********************************************************************************
++*				macOS
++***********************************************************************************/
++
++#elif __APPLE__
++
++#include <unistd.h>
++#include <mach/mach.h>
++#include <mach/thread_policy.h>
++#define __CPU_SETSIZE 1024                  // ported from Linux
++#define CPU_SETSIZE __CPU_SETSIZE
++
+ /***********************************************************************************
+ *				Linux
+ ***********************************************************************************/
+@@ -182,6 +194,8 @@ typedef struct os_cpuset_t {
+     DWORD_PTR cpuset;
+ #elif __FreeBSD__
+     cpuset_t cpuset;
++#elif __APPLE__
++    thread_affinity_policy_data_t cpuset;
+ #else
+     cpu_set_t cpuset;
+ #endif
+diff --git a/src/server.cpp b/src/server.cpp
+index a555814..0991d7d 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -84,7 +84,7 @@ int ServerBase::initBeforeLoop() {
+                 is_multicast_addr(*p_bind_addr)) {
+                 // if more then one address on socket (for multiple MC join case oon same port)
+                 memcpy(&bind_addr, p_bind_addr, bind_addr_len);
+-                switch (bind_addr.ss_family) {
++                switch (bind_addr.addr.sa_family) {
+                 case AF_INET:
+                     reinterpret_cast<sockaddr_in &>(bind_addr).sin_addr.s_addr = INADDR_ANY;
+                     break;
+@@ -416,7 +416,7 @@ void server_handler(handler_info *p_info) {
+             server_handler<IoPoll>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+             break;
+         }
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__)
+         case EPOLL: {
+             server_handler<IoEpoll>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+             break;
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 7b1f1a9..1fd8dd8 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -76,7 +76,7 @@
+  *
+  */
+ 
+-#if defined(__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9))
++#if !defined(__APPLE__) && (defined(__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9)))
+ #   define NEED_REGEX_WORKAROUND
+ #endif
+ 
+@@ -1760,7 +1760,7 @@ static int resolve_sockaddr(const char *host, const char *port, int sock_type,
+             addr_len = sizeof(struct sockaddr_un);
+             memset(tmp->addr_un.sun_path, 0, sizeof(tmp->addr_un.sun_path));
+             memcpy(tmp->addr_un.sun_path, path.c_str(), path.length());
+-            tmp->ss_family = AF_UNIX;
++            tmp->addr.sa_family = AF_UNIX;
+ 
+ #ifdef NEED_REGEX_WORKAROUND
+             regfree(&regexpr_unix);
+@@ -2395,7 +2395,7 @@ void cleanup() {
+                 if (g_fds_array[ifd]->is_multicast) {
+                     FREE(g_fds_array[ifd]->memberships_addr);
+                 }
+-                if (s_user_params.addr.ss_family == AF_UNIX) {
++                if (s_user_params.addr.addr.sa_family == AF_UNIX) {
+                     os_unlink_unix_path(s_user_params.client_bind_info.addr_un.sun_path);
+ #ifndef __windows__ // AF_UNIX with DGRAM isn't supported in __windows__
+                     if (s_user_params.mode == MODE_CLIENT && s_user_params.sock_type == SOCK_DGRAM) { // unlink binded client
+@@ -2496,7 +2496,7 @@ void set_defaults() {
+     s_user_params.rx_mc_if_addr = IPAddress::zero();
+     s_user_params.tx_mc_if_addr = IPAddress::zero();
+     s_user_params.mc_source_ip_addr = IPAddress::zero();
+-    s_user_params.client_bind_info.ss_family = AF_UNSPEC;
++    s_user_params.client_bind_info.addr.sa_family = AF_UNSPEC;
+ 
+     set_select_timeout(DEFAULT_SELECT_TIMEOUT_MSEC);
+     memset(s_user_params.threads_affinity, 0, sizeof(s_user_params.threads_affinity));
+@@ -3013,7 +3013,7 @@ int prepare_socket(int fd, struct fds_data *p_data)
+ 
+     if (!rc && (p_data->is_multicast)) {
+         struct sockaddr_store_t *p_addr = &(p_data->server_addr);
+-        switch (p_addr->ss_family) {
++        switch (p_addr->addr.sa_family) {
+         case AF_INET:
+             rc = sock_set_multicast_v4(fd, p_data);
+             break;
+@@ -3065,11 +3065,11 @@ int prepare_socket(int fd, struct fds_data *p_data)
+ //------------------------------------------------------------------------------
+ static bool is_unspec_addr(const sockaddr_store_t &addr)
+ {
+-    switch (addr.ss_family) {
++    switch (addr.addr.sa_family) {
+     case AF_INET:
+-        return reinterpret_cast<const sockaddr_in &>(addr).sin_addr.s_addr == INADDR_ANY;
++        return addr.addr4.sin_addr.s_addr == INADDR_ANY;
+     case AF_INET6:
+-        return IN6_IS_ADDR_UNSPECIFIED(&reinterpret_cast<const sockaddr_in6 &>(addr).sin6_addr);
++        return IN6_IS_ADDR_UNSPECIFIED(&addr.addr6.sin6_addr);
+     }
+     return true;
+ }
+@@ -3266,7 +3266,7 @@ static int set_sockets_from_feedfile(const char *feedfile_name) {
+         /* Check if the same value exists */
+         bool is_exist = false;
+         in_port_t port_tmp = ntohs(sockaddr_get_portn(tmp->server_addr));
+-        port_descriptor port_desc_tmp = { tmp->sock_type, tmp->server_addr.ss_family, port_tmp };
++        port_descriptor port_desc_tmp = { tmp->sock_type, tmp->server_addr.addr.sa_family, port_tmp };
+         for (int i = s_fd_min; i <= s_fd_max; i++) {
+             /* duplicated values are accepted in case client connection using TCP */
+             /* or in case source address is set for multicast socket */
+@@ -3290,11 +3290,11 @@ static int set_sockets_from_feedfile(const char *feedfile_name) {
+             continue;
+         }
+ 
+-        if (tmp->server_addr.ss_family == AF_UNIX) {
++        if (tmp->server_addr.addr.sa_family == AF_UNIX) {
+             s_user_params.tcp_nodelay = false;
+             s_user_params.addr = tmp->server_addr;
+             if (tmp->sock_type == SOCK_DGRAM) // for later binding client
+-                s_user_params.client_bind_info.ss_family = AF_UNIX;
++                s_user_params.client_bind_info.addr.sa_family = AF_UNIX;
+         }
+         tmp->active_fd_count = 0;
+         tmp->active_fd_list = (int *)MALLOC(MAX_ACTIVE_FD_NUM * sizeof(int));
+@@ -3317,7 +3317,7 @@ static int set_sockets_from_feedfile(const char *feedfile_name) {
+                 g_fds_array[curr_fd]->memberships_size++;
+             } else {
+                 /* create a socket */
+-                if ((curr_fd = (int)socket(tmp->server_addr.ss_family, tmp->sock_type, 0)) <
++                if ((curr_fd = (int)socket(tmp->server_addr.addr.sa_family, tmp->sock_type, 0)) <
+                     0) { // TODO: use SOCKET all over the way and avoid this cast
+                     log_err("socket(AF_INET4/6, SOCK_x)");
+                     rc = SOCKPERF_ERR_SOCKET;
+@@ -3565,12 +3565,11 @@ int bringup(const int *p_daemonize) {
+                 (int)INVALID_SOCKET; // TODO: use SOCKET all over the way and avoid this cast
+ 
+             std::unique_ptr<fds_data> tmp{ new fds_data };
+-
+-            if (s_user_params.addr.ss_family == AF_UNIX) {
++            if (s_user_params.addr.addr.sa_family == AF_UNIX) {
+                 log_dbg("UNIX domain socket was provided %s\n", s_user_params.addr.addr_un.sun_path);
+                 s_user_params.tcp_nodelay = false;
+                 if (s_user_params.sock_type == SOCK_DGRAM) { // Need to bind localy
+-                    s_user_params.client_bind_info.ss_family = AF_UNIX;
++                    s_user_params.client_bind_info.addr.sa_family = AF_UNIX;
+                 }
+             }
+             memcpy(&tmp->server_addr, &(s_user_params.addr), sizeof(s_user_params.addr));
+@@ -3586,7 +3585,7 @@ int bringup(const int *p_daemonize) {
+                 rc = SOCKPERF_ERR_NO_MEMORY;
+             } else {
+                 /* create a socket */
+-                if ((curr_fd = (int)socket(tmp->server_addr.ss_family, tmp->sock_type, 0)) <
++                if ((curr_fd = (int)socket(tmp->server_addr.addr.sa_family, tmp->sock_type, 0)) <
+                     0) { // TODO: use SOCKET all over the way and avoid this cast
+                     log_err("socket(AF_INET4/6/AF_UNIX, SOCK_x)");
+                     rc = SOCKPERF_ERR_SOCKET;
+diff --git a/src/vma-xlio-redirect.h b/src/vma-xlio-redirect.h
+index 7b4baab..e09ba7e 100644
+--- a/src/vma-xlio-redirect.h
++++ b/src/vma-xlio-redirect.h
+@@ -40,6 +40,9 @@
+ #ifdef __FreeBSD__
+ #include <netinet/in.h>
+ #include <stdio.h>
++#elif __APPLE__
++#include <netinet/in.h>
++#include <stdio.h>
+ #else
+ #include <resolv.h>
+ #include <sys/epoll.h>
+-- 
+2.43.0
+

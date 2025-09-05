@@ -1,0 +1,63 @@
+From 8dbba7f43e2b52c67f58e3fa312aa35eeb2654bb Mon Sep 17 00:00:00 2001
+From: Wonsup Yoon <pusnow@kaist.ac.kr>
+Date: Fri, 24 Feb 2023 19:46:01 +0900
+Subject: [PATCH 09/33] Hide epoll/EPOLL in macOS/FreeBSD & fix Windows default
+
+---
+ src/common.cpp   | 7 ++++++-
+ src/defs.h       | 3 +++
+ src/sockperf.cpp | 4 +++-
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/src/common.cpp b/src/common.cpp
+index 565c3cc..0cb1a76 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -234,7 +234,12 @@ const char *handler2str(fd_block_handler_t type) {
+     static const char *s_fds_handle_desc[FD_HANDLE_MAX] = { "recvfrom", "recvfrom", "select"
+ #ifndef __windows__
+                                                             ,
+-                                                            "poll", "epoll", "kqueue",
++                                                            "poll",
++#ifdef __linux__
++                                                            "epoll",
++#elif defined(__APPLE__) || defined(__FreeBSD__)
++                                                            "kqueue",
++#endif // defined(__APPLE__) || defined(__FreeBSD__)
+ #ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+                                                             "socketxtreme"
+ #endif // USING_VMA_EXTRA_API
+diff --git a/src/defs.h b/src/defs.h
+index e5e0114..21c4c1f 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -696,8 +696,11 @@ typedef enum { // must be coordinated with s_fds_handle_desc in common.cpp
+     SELECT,
+ #ifndef __windows__
+     POLL,
++#ifdef __linux__
+     EPOLL,
++#elif defined(__APPLE__) || defined(__FreeBSD__)
+     KQUEUE,
++#endif // defined(__APPLE__) || defined(__FreeBSD__)
+ #endif
+     SOCKETXTREME,
+     FD_HANDLE_MAX } fd_block_handler_t;
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index e3639f3..16b2c73 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -1819,7 +1819,9 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                 if (optarg) {
+                     strncpy(feedfile_name, optarg, MAX_ARGV_SIZE);
+                     feedfile_name[MAX_PATH_LENGTH - 1] = '\0';
+-#if defined(__windows__) || defined(__FreeBSD__) || defined(__APPLE__)
++#if defined(__windows__)
++                    s_user_params.fd_handler_type = SELECT;
++#elif defined(__FreeBSD__) || defined(__APPLE__)
+                     s_user_params.fd_handler_type = KQUEUE;
+ #else
+                     s_user_params.fd_handler_type = EPOLL;
+-- 
+2.43.0
+

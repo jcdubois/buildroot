@@ -1,0 +1,25 @@
+From d7da90b30dcdc527501c5495e1d20a393956ba5a Mon Sep 17 00:00:00 2001
+From: Lili Deng <lildeng@microsoft.com>
+Date: Mon, 16 Dec 2024 13:38:22 +0800
+Subject: [PATCH 30/33] fix compile error on freebsd
+
+---
+ src/ip_address.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/ip_address.h b/src/ip_address.h
+index e9127c3..f9d696c 100644
+--- a/src/ip_address.h
++++ b/src/ip_address.h
+@@ -43,7 +43,7 @@ typedef unsigned short int sa_family_t;
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <sys/un.h>      /* definitions for UNIX domain sockets */
+-
++#include <cstring>
+ #endif // defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__)
+ 
+ #include "os_abstract.h"
+-- 
+2.43.0
+

@@ -1,0 +1,90 @@
+From ca16d475d6fa8563317aaffc208dc664d20117df Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Sven=20P=C3=BCschel?= <s.pueschel@pengutronix.de>
+Date: Wed, 26 Apr 2023 18:28:23 +0000
+Subject: [PATCH 11/33] Fixed AArch32 compilation
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+sockperf added support for AArch64, but at the same time it broke AArch32 support,
+as this wasn't catched by a compiler macro anymore and resulted in trying to assemble a rdtsc instruction.
+
+See https://github.com/Mellanox/sockperf/commit/d84e8179f8ab007c7a19dfe263691b0429df7565
+and https://github.com/Mellanox/sockperf/pull/187
+
+Signed-off-by: Sven Püschel <s.pueschel@pengutronix.de>
+---
+ src/defs.h       | 4 ++++
+ src/sockperf.cpp | 4 ++++
+ src/ticks_os.h   | 5 +++++
+ 3 files changed, 13 insertions(+)
+
+diff --git a/src/defs.h b/src/defs.h
+index fd75e1f..8565f1b 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -750,7 +750,11 @@ struct user_params_t {
+     socklen_t client_bind_info_len = 0;
+     uint32_t reply_every = REPLY_EVERY_DEFAULT;    // client side only
+     bool b_client_ping_pong = false; // client side only
++#if !defined(__arm__) || defined(__aarch64__)
+     bool b_no_rdtsc = false;
++#else
++    bool b_no_rdtsc = true;
++#endif
+     char sender_affinity[MAX_ARGV_SIZE];
+     char receiver_affinity[MAX_ARGV_SIZE];
+     FILE *fileFullLog = NULL;                   // client side only
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index db78367..6173882 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -272,11 +272,13 @@ static const AOPT_DESC common_opt_desc[] = {
+       "Use VMA's zero copy reads API (See VMA's readme)." },
+     { OPT_DAEMONIZE, AOPT_NOARG, aopt_set_literal(0), aopt_set_string("daemonize"), "Run as "
+                                                                                     "daemon." },
++#if !defined(__arm__) || defined(__aarch64__)
+     { OPT_NO_RDTSC,
+       AOPT_NOARG,
+       aopt_set_literal(0),
+       aopt_set_string("no-rdtsc"),
+       "Don't use register when taking time; instead use monotonic clock." },
++#endif
+     { OPT_LOAD_VMA,                                             AOPT_OPTARG,
+       aopt_set_literal(0),                                      aopt_set_string("load-vma"),
+       "Load VMA dynamically even when LD_PRELOAD was not used." },
+@@ -3901,6 +3903,7 @@ packet pace limit = %d",
+         log_dbg("+INFO: taking time, using the given settings, consumes %.3lf nsec",
+                 (double)(end - start).toNsec() / SIZE);
+ 
++    if (!s_user_params.b_no_rdtsc) {
+         ticks_t tstart = 0, tend = 0;
+         tstart = os_gettimeoftsc();
+ 
+@@ -3911,6 +3914,7 @@ packet pace limit = %d",
+         double ticks_per_second = (double)get_tsc_rate_per_second();
+         log_dbg("+INFO: taking rdtsc directly consumes %.3lf nsec",
+                 tdelta / SIZE * 1000 * 1000 * 1000 / ticks_per_second);
++    }
+ 
+         // step #5: check is user defined a specific SEED value to be used in all rand() calls
+         // if no seed value is provided, the rand() function is automatically seeded with a value of
+diff --git a/src/ticks_os.h b/src/ticks_os.h
+index 6e1436b..af00de5 100644
+--- a/src/ticks_os.h
++++ b/src/ticks_os.h
+@@ -99,6 +99,11 @@ inline ticks_t os_gettimeoftsc() {
+     asm volatile("isb" : : : "memory");
+     asm volatile("mrs %0, cntvct_el0" : "=r" (ret));
+     return ret;
++#elif defined(__arm__)
++    // so the compiler will not complain. for
++    // AArch32 compile, this inline is not used
++    // since rdtsc is only supported in an optional timer extension
++    upper_32 = lower_32 = 0;
+ #else
+     // ReaD Time Stamp Counter (RDTCS)
+     __asm__ __volatile__("rdtsc" : "=a"(lower_32), "=d"(upper_32));
+-- 
+2.43.0
+

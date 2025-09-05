@@ -1,0 +1,62 @@
+From 8c23bf70c83853c576034085ab86ad28158450e1 Mon Sep 17 00:00:00 2001
+From: Alexander Grissik <agrissik@nvidia.com>
+Date: Tue, 25 Jul 2023 12:01:46 +0300
+Subject: [PATCH 18/33] issue: 3466098 CI switch to beni09
+
+Signed-off-by: Alexander Grissik <agrissik@nvidia.com>
+---
+ .ci/matrix_job.yaml | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/.ci/matrix_job.yaml b/.ci/matrix_job.yaml
+index 655fd79..7963d02 100644
+--- a/.ci/matrix_job.yaml
++++ b/.ci/matrix_job.yaml
+@@ -37,7 +37,7 @@ runs_on_dockers:
+   - {name: 'header-check', url: 'harbor.mellanox.com/toolbox/header_check:0.0.15', category: 'tool', arch: 'x86_64', tag: '0.0.15'}
+ 
+ runs_on_agents:
+-  - {nodeLabel: 'r-aa-fatty02', category: 'base'}
++  - {nodeLabel: 'beni09', category: 'base'}
+ 
+ matrix:
+   axes:
+@@ -174,7 +174,7 @@ steps:
+     containerSelector:
+       - "{name: 'skip-container'}"
+     agentSelector:
+-      - "{nodeLabel: 'r-aa-fatty02', variant:1}"
++      - "{nodeLabel: 'beni09', variant:1}"
+     run: |
+       [ "x${do_cppcheck}" == "xtrue" ] && action=yes || action=no
+       env WORKSPACE=$PWD TARGET=${flags} jenkins_test_cppcheck=${action} ./contrib/test_jenkins.sh
+@@ -191,7 +191,7 @@ steps:
+     containerSelector:
+       - "{name: 'skip-container'}"
+     agentSelector:
+-      - "{nodeLabel: 'r-aa-fatty02', variant:1}"
++      - "{nodeLabel: 'beni09', variant:1}"
+     run: |
+       [ "x${do_csbuild}" == "xtrue" ] && action=yes || action=no
+       env WORKSPACE=$PWD TARGET=${flags} jenkins_test_csbuild=${action} ./contrib/test_jenkins.sh
+@@ -208,7 +208,7 @@ steps:
+     containerSelector:
+       - "{name: 'skip-container'}"
+     agentSelector:
+-      - "{nodeLabel: 'r-aa-fatty02'}"
++      - "{nodeLabel: 'beni09'}"
+     run: |
+       [ "x${do_gtest}" == "xtrue" ] && action=yes || action=no
+       env WORKSPACE=$PWD TARGET=${flags} jenkins_test_gtest=${action} ./contrib/test_jenkins.sh
+@@ -227,7 +227,7 @@ steps:
+     containerSelector:
+       - "{name: 'skip-container'}"
+     agentSelector:
+-      - "{nodeLabel: 'r-aa-fatty02', variant:1}"
++      - "{nodeLabel: 'beni09', variant:1}"
+     run: |
+       [ "x${do_test}" == "xtrue" ] && action=yes || action=no
+       env WORKSPACE=$PWD TARGET=${flags} jenkins_test_run=${action} ./contrib/test_jenkins.sh
+-- 
+2.43.0
+

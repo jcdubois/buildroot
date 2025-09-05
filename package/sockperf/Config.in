@@ -1,0 +1,11 @@
+config BR2_PACKAGE_SOCKPERF
+    bool "sockperf"
+    depends on BR2_INSTALL_LIBSTDCPP
+    depends on !BR2_STATIC_LIBS
+    help
+      sockperf is a network benchmarking utility for testing latency and
+      throughput over socket-based communications.
+      https://github.com/mellanox/sockperf
+
+comment "sockperf needs a toolchain w/ C++, dynamic library"
+     depends on !BR2_INSTALL_LIBSTDCPP || BR2_STATIC_LIBS

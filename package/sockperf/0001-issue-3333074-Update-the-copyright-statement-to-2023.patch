@@ -1,0 +1,584 @@
+From 70fb20d832a513b7b32ded16de8ebaa2c143a848 Mon Sep 17 00:00:00 2001
+From: Alex Briskin <abriskin@nvidia.com>
+Date: Tue, 17 Jan 2023 08:13:23 +0200
+Subject: [PATCH 01/33] issue: 3333074 Update the copyright statement to 2023
+
+Signed-off-by: Alex Briskin <abriskin@nvidia.com>
+---
+ config/m4/tls.m4                     | 2 +-
+ contrib/test_jenkins.sh              | 2 +-
+ copying                              | 2 +-
+ debian/copyright                     | 2 +-
+ src/aopt.cpp                         | 2 +-
+ src/aopt.h                           | 2 +-
+ src/client.cpp                       | 2 +-
+ src/client.h                         | 2 +-
+ src/clock.h                          | 2 +-
+ src/common.cpp                       | 2 +-
+ src/common.h                         | 2 +-
+ src/defs.cpp                         | 2 +-
+ src/defs.h                           | 4 ++--
+ src/input_handlers.h                 | 2 +-
+ src/iohandlers.cpp                   | 2 +-
+ src/iohandlers.h                     | 2 +-
+ src/ip_address.cpp                   | 2 +-
+ src/ip_address.h                     | 2 +-
+ src/message.cpp                      | 2 +-
+ src/message.h                        | 2 +-
+ src/message_parser.h                 | 2 +-
+ src/os_abstract.cpp                  | 2 +-
+ src/os_abstract.h                    | 2 +-
+ src/packet.cpp                       | 2 +-
+ src/packet.h                         | 2 +-
+ src/playback.cpp                     | 2 +-
+ src/playback.h                       | 2 +-
+ src/port_descriptor.h                | 2 +-
+ src/server.cpp                       | 2 +-
+ src/server.h                         | 2 +-
+ src/sockperf.cpp                     | 2 +-
+ src/switches.h                       | 2 +-
+ src/ticks.cpp                        | 2 +-
+ src/ticks.h                          | 2 +-
+ src/ticks_os.h                       | 2 +-
+ src/tls.cpp                          | 2 +-
+ src/tls.h                            | 2 +-
+ src/vma-xlio-redirect.cpp            | 2 +-
+ src/vma-xlio-redirect.h              | 2 +-
+ tests/avner-master-test.sh           | 2 +-
+ tests/avner-test.sh                  | 2 +-
+ tests/gtest/main.cpp                 | 2 +-
+ tests/gtest/message_parser_tests.cpp | 2 +-
+ tests/verifier/verifier.pl           | 2 +-
+ tests/vma_multiplexers_test.sh       | 2 +-
+ tests/vma_perf_envelope.sh           | 2 +-
+ 46 files changed, 47 insertions(+), 47 deletions(-)
+
+diff --git a/config/m4/tls.m4 b/config/m4/tls.m4
+index b511b6e..1fd3e32 100644
+--- a/config/m4/tls.m4
++++ b/config/m4/tls.m4
+@@ -1,6 +1,6 @@
+ # tls.m4 - Library to operate TLS
+ # 
+-# Copyright (C) Mellanox Technologies Ltd. 2020-2021.  ALL RIGHTS RESERVED.
++# Copyright (C) Mellanox Technologies Ltd. 2020-2023.  ALL RIGHTS RESERVED.
+ # See file LICENSE for terms.
+ #
+ 
+diff --git a/contrib/test_jenkins.sh b/contrib/test_jenkins.sh
+index eba1d63..31e1bd9 100755
+--- a/contrib/test_jenkins.sh
++++ b/contrib/test_jenkins.sh
+@@ -2,7 +2,7 @@
+ #
+ # Testing script for SOCKPERF, to run from Jenkins CI
+ #
+-# Copyright (C) Mellanox Technologies Ltd. 2011-2022. ALL RIGHTS RESERVED.
++# Copyright (C) Mellanox Technologies Ltd. 2011-2023. ALL RIGHTS RESERVED.
+ #
+ # See file LICENSE for terms.
+ #
+diff --git a/copying b/copying
+index cadcb1d..45f556c 100644
+--- a/copying
++++ b/copying
+@@ -1,5 +1,5 @@
+  /*
+- * Copyright (c) 2011-2022 Mellanox Technologies Ltd.
++ * Copyright (c) 2011-2023 Mellanox Technologies Ltd.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/debian/copyright b/debian/copyright
+index 4bbab23..a128bd5 100644
+--- a/debian/copyright
++++ b/debian/copyright
+@@ -17,7 +17,7 @@ Source: <url://example.com>
+ ### Please avoid to pick license terms that are more restrictive than the
+ ### packaged work, as it may make Debian's contributions unacceptable upstream.
+ 
+-Copyright: 2011-2022 Mellanox Technologies, Ltd.
++Copyright: 2011-2023 Mellanox Technologies, Ltd.
+ License:   __UNKNOWN__
+  Redistribution and use in source and binary forms, with or without modification,
+  are permitted provided that the following conditions are met:
+diff --git a/src/aopt.cpp b/src/aopt.cpp
+index 5c97f4e..7e6f6c1 100644
+--- a/src/aopt.cpp
++++ b/src/aopt.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/aopt.h b/src/aopt.h
+index c3a1db3..719f615 100644
+--- a/src/aopt.h
++++ b/src/aopt.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/client.cpp b/src/client.cpp
+index ed9bc18..f5f71c1 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/client.h b/src/client.h
+index 7f9ad6d..031a470 100644
+--- a/src/client.h
++++ b/src/client.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/clock.h b/src/clock.h
+index 5e18ec0..e6f4ab4 100644
+--- a/src/clock.h
++++ b/src/clock.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/common.cpp b/src/common.cpp
+index fbb1240..5871153 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/common.h b/src/common.h
+index 1d00e85..11652a0 100644
+--- a/src/common.h
++++ b/src/common.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/defs.cpp b/src/defs.cpp
+index 4ce4f73..067f6fe 100644
+--- a/src/defs.cpp
++++ b/src/defs.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/defs.h b/src/defs.h
+index 0ec450d..159e77e 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+@@ -285,7 +285,7 @@ static const char *const round_trip_str[] = { "latency", "rtt" };
+ 
+ #define MODULE_NAME "sockperf"
+ #define MODULE_COPYRIGHT                                                                           \
+-    "Copyright (C) 2011-2022 Mellanox Technologies Ltd."                                           \
++    "Copyright (C) 2011-2023 Mellanox Technologies Ltd."                                           \
+     "\nSockPerf is open source software, see http://github.com/mellanox/sockperf"
+ #define log_msg(log_fmt, ...) printf(MODULE_NAME ": " log_fmt "\n", ##__VA_ARGS__)
+ #define log_msg_file(file, log_fmt, ...) fprintf(file, MODULE_NAME ": " log_fmt "\n", ##__VA_ARGS__)
+diff --git a/src/input_handlers.h b/src/input_handlers.h
+index c1f9b3c..b2c9d75 100644
+--- a/src/input_handlers.h
++++ b/src/input_handlers.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/iohandlers.cpp b/src/iohandlers.cpp
+index 0b49654..704eae9 100644
+--- a/src/iohandlers.cpp
++++ b/src/iohandlers.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 9d67115..0b1053e 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/ip_address.cpp b/src/ip_address.cpp
+index 994e42b..749ed19 100644
+--- a/src/ip_address.cpp
++++ b/src/ip_address.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/ip_address.h b/src/ip_address.h
+index dc4be7b..635df4e 100644
+--- a/src/ip_address.h
++++ b/src/ip_address.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/message.cpp b/src/message.cpp
+index d77b1b6..29b32d7 100644
+--- a/src/message.cpp
++++ b/src/message.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/message.h b/src/message.h
+index 01e6ccd..cb3bf7f 100644
+--- a/src/message.h
++++ b/src/message.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/message_parser.h b/src/message_parser.h
+index 2461181..d64c2c2 100644
+--- a/src/message_parser.h
++++ b/src/message_parser.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/os_abstract.cpp b/src/os_abstract.cpp
+index d21a8b8..8e1a507 100644
+--- a/src/os_abstract.cpp
++++ b/src/os_abstract.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/os_abstract.h b/src/os_abstract.h
+index 808fe1f..d3f9395 100644
+--- a/src/os_abstract.h
++++ b/src/os_abstract.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/packet.cpp b/src/packet.cpp
+index 462005c..15bfda3 100644
+--- a/src/packet.cpp
++++ b/src/packet.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/packet.h b/src/packet.h
+index 558455d..5d172e5 100644
+--- a/src/packet.h
++++ b/src/packet.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/playback.cpp b/src/playback.cpp
+index af931d9..375c464 100644
+--- a/src/playback.cpp
++++ b/src/playback.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/playback.h b/src/playback.h
+index 38e1012..a65957f 100644
+--- a/src/playback.h
++++ b/src/playback.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/port_descriptor.h b/src/port_descriptor.h
+index 3ea6b43..86ecfb7 100644
+--- a/src/port_descriptor.h
++++ b/src/port_descriptor.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/server.cpp b/src/server.cpp
+index bdadc86..a555814 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/server.h b/src/server.h
+index e1571e4..91188cc 100644
+--- a/src/server.h
++++ b/src/server.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 293d217..efd302e 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/switches.h b/src/switches.h
+index f96533f..954c4b4 100644
+--- a/src/switches.h
++++ b/src/switches.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/ticks.cpp b/src/ticks.cpp
+index 6a30c71..a7b0ea1 100644
+--- a/src/ticks.cpp
++++ b/src/ticks.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/ticks.h b/src/ticks.h
+index e59aaf8..b29b3e3 100644
+--- a/src/ticks.h
++++ b/src/ticks.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/ticks_os.h b/src/ticks_os.h
+index 0f23b2c..6e1436b 100644
+--- a/src/ticks_os.h
++++ b/src/ticks_os.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/tls.cpp b/src/tls.cpp
+index 0095125..9245df9 100644
+--- a/src/tls.cpp
++++ b/src/tls.cpp
+@@ -1,6 +1,6 @@
+ /*
+  *
+- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/tls.h b/src/tls.h
+index 0764d72..43c3f05 100644
+--- a/src/tls.h
++++ b/src/tls.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/vma-xlio-redirect.cpp b/src/vma-xlio-redirect.cpp
+index 3ac2006..b89cb68 100644
+--- a/src/vma-xlio-redirect.cpp
++++ b/src/vma-xlio-redirect.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/src/vma-xlio-redirect.h b/src/vma-xlio-redirect.h
+index e8bca75..7b4baab 100644
+--- a/src/vma-xlio-redirect.h
++++ b/src/vma-xlio-redirect.h
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/avner-master-test.sh b/tests/avner-master-test.sh
+index 5bc0d5c..d43068e 100755
+--- a/tests/avner-master-test.sh
++++ b/tests/avner-master-test.sh
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ #
+-# Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+ # Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/avner-test.sh b/tests/avner-test.sh
+index d7c996e..81388aa 100755
+--- a/tests/avner-test.sh
++++ b/tests/avner-test.sh
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ #
+-# Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+ # Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/gtest/main.cpp b/tests/gtest/main.cpp
+index 09fe697..6c10b5b 100644
+--- a/tests/gtest/main.cpp
++++ b/tests/gtest/main.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/gtest/message_parser_tests.cpp b/tests/gtest/message_parser_tests.cpp
+index 54a03db..c64932e 100644
+--- a/tests/gtest/message_parser_tests.cpp
++++ b/tests/gtest/message_parser_tests.cpp
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++ * Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+  * Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/verifier/verifier.pl b/tests/verifier/verifier.pl
+index 544b612..2fe14c4 100755
+--- a/tests/verifier/verifier.pl
++++ b/tests/verifier/verifier.pl
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env perl
+ #
+-# Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+ # Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/vma_multiplexers_test.sh b/tests/vma_multiplexers_test.sh
+index a738695..2c38d33 100755
+--- a/tests/vma_multiplexers_test.sh
++++ b/tests/vma_multiplexers_test.sh
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ 
+-# Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+ # Redistribution and use in source and binary forms, with or without modification,
+diff --git a/tests/vma_perf_envelope.sh b/tests/vma_perf_envelope.sh
+index 3bb99b7..43c3811 100755
+--- a/tests/vma_perf_envelope.sh
++++ b/tests/vma_perf_envelope.sh
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ 
+-# Copyright (c) 2011-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# Copyright (c) 2011-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+ # Redistribution and use in source and binary forms, with or without modification,
+-- 
+2.43.0
+

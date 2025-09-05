@@ -1,0 +1,294 @@
+From b22773a91e93d9dce45e87ea66319310bb873578 Mon Sep 17 00:00:00 2001
+From: Igor Ivanov <igori@nvidia.com>
+Date: Fri, 10 Mar 2023 20:04:10 +0200
+Subject: [PATCH 10/33] issue: 3395514 Improve socket scalablity
+
+Maximum number of file descriptors is taken from system.
+In most cases it should be 'ulimit -Sn' value.
+Maximum active tcp socket connections is identical (can be
+considered to use vector instead to reduce memory usage)
+
+Signed-off-by: Igor Ivanov <igori@nvidia.com>
+---
+ src/defs.cpp        |  2 +-
+ src/defs.h          |  6 ++----
+ src/iohandlers.cpp  | 10 +++++-----
+ src/iohandlers.h    | 12 ++++++------
+ src/os_abstract.cpp | 11 ++++++-----
+ src/os_abstract.h   |  2 +-
+ src/server.cpp      |  6 +++---
+ src/sockperf.cpp    | 10 ++++++----
+ src/tls.cpp         |  2 +-
+ 9 files changed, 31 insertions(+), 30 deletions(-)
+
+diff --git a/src/defs.cpp b/src/defs.cpp
+index 067f6fe..aa1a77b 100644
+--- a/src/defs.cpp
++++ b/src/defs.cpp
+@@ -63,7 +63,7 @@ PacketTimes *g_pPacketTimes = NULL;
+ 
+ TicksTime g_lastTicks;
+ 
+-const int MAX_FDS_NUM = os_get_max_active_fds_num();
++int max_fds_num = 0;
+ fds_data **g_fds_array = NULL;
+ int MAX_PAYLOAD_SIZE = 65507;
+ int IGMP_MAX_MEMBERSHIPS = IP_MAX_MEMBERSHIPS;
+diff --git a/src/defs.h b/src/defs.h
+index 21c4c1f..fd75e1f 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -155,7 +155,7 @@ typedef unsigned short int sa_family_t;
+ 
+ #define MIN_PAYLOAD_SIZE (MsgHeader::EFFECTIVE_SIZE)
+ extern int MAX_PAYLOAD_SIZE;
+-#define MAX_STREAM_SIZE (50 * 1024 * 1024)
++extern int max_fds_num;
+ #define MAX_TCP_SIZE ((1 << 20) - 1)
+ 
+ const uint32_t MPS_MAX_UL =
+@@ -185,8 +185,7 @@ const uint32_t TEST_FIRST_CONNECTION_FIRST_PACKET_TTL_THRESHOLD_MSEC = 50;
+ #define DEFAULT_CI_SIG_LEVEL 99
+ #define DUMMY_PORT 57341
+ #define MAX_ACTIVE_FD_NUM                                                                          \
+-    1024 /* maximum number of active connection to the single TCP addr:port                        \
+-            */
++    max_fds_num /* maximum number of active connection to the single TCP addr:port */
+ #ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+ #define MAX_VMA_COMPS 1024 /* maximum size for the VMA completions array for VMA Poll */
+ #endif // USING_VMA_EXTRA_API
+@@ -222,7 +221,6 @@ const uint32_t TEST_FIRST_CONNECTION_FIRST_PACKET_TTL_THRESHOLD_MSEC = 50;
+ #define MAX_ARGV_SIZE 256
+ #define MAX_DURATION 36000000
+ #define MAX_PACKET_NUMBER 100000000
+-extern const int MAX_FDS_NUM;
+ #define SOCK_BUFF_DEFAULT_SIZE 0
+ #define DEFAULT_SELECT_TIMEOUT_MSEC 10
+ #define DEFAULT_DEBUG_LEVEL 0
+diff --git a/src/iohandlers.cpp b/src/iohandlers.cpp
+index 742c94f..f5c1ce2 100644
+--- a/src/iohandlers.cpp
++++ b/src/iohandlers.cpp
+@@ -182,7 +182,7 @@ IoPoll::~IoPoll() {
+ int IoPoll::prepareNetwork() {
+     int rc = SOCKPERF_ERR_NONE;
+ 
+-    mp_poll_fd_arr = (struct pollfd *)MALLOC(MAX_FDS_NUM * sizeof(struct pollfd));
++    mp_poll_fd_arr = (struct pollfd *)MALLOC(max_fds_num * sizeof(struct pollfd));
+     if (!mp_poll_fd_arr) {
+         log_err("Failed to allocate memory for poll fd array");
+         rc = SOCKPERF_ERR_NO_MEMORY;
+@@ -229,14 +229,14 @@ int IoEpoll::prepareNetwork() {
+     struct epoll_event ev = { 0, { 0 } };
+ 
+     int list_count = 0;
+-    mp_epoll_events = (struct epoll_event *)MALLOC(MAX_FDS_NUM * sizeof(struct epoll_event));
++    mp_epoll_events = (struct epoll_event *)MALLOC(max_fds_num * sizeof(struct epoll_event));
+     if (!mp_epoll_events) {
+         log_err("Failed to allocate memory for epoll event array");
+         rc = SOCKPERF_ERR_NO_MEMORY;
+     } else {
+         printf("\n");
+         m_max_events = 0;
+-        m_epfd = epoll_create(MAX_FDS_NUM);
++        m_epfd = epoll_create(max_fds_num);
+         for (int ifd = m_fd_min; ifd <= m_fd_max; ifd++) {
+             if (g_fds_array[ifd]) {
+                 print_addresses(g_fds_array[ifd], list_count);
+@@ -281,8 +281,8 @@ int IoKqueue::prepareNetwork() {
+     int rc = SOCKPERF_ERR_NONE;
+ 
+     int list_count = 0; 
+-    mp_kqueue_events = (struct kevent *)MALLOC(MAX_FDS_NUM * sizeof(struct kevent));
+-    mp_kqueue_changes = (struct kevent *)MALLOC(MAX_FDS_NUM * sizeof(struct kevent));
++    mp_kqueue_events = (struct kevent *)MALLOC(max_fds_num * sizeof(struct kevent));
++    mp_kqueue_changes = (struct kevent *)MALLOC(max_fds_num * sizeof(struct kevent));
+     if (!mp_kqueue_events) {
+         log_err("Failed to allocate memory for kqueue event array");
+         rc = SOCKPERF_ERR_NO_MEMORY;
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 99ae447..519ea28 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -285,7 +285,7 @@ public:
+ 
+     //------------------------------------------------------------------------------
+     inline int analyzeArrival(int ifd) const {
+-        assert((ifd < MAX_FDS_NUM) && "exceeded tool limitation (MAX_FDS_NUM)");
++        assert((ifd < max_fds_num) && "exceeded tool limitation (max_fds_num)");
+ 
+         if (mp_poll_fd_arr[ifd].revents & POLLIN || mp_poll_fd_arr[ifd].revents & POLLPRI ||
+             mp_poll_fd_arr[ifd].revents & POLLERR || mp_poll_fd_arr[ifd].revents & POLLHUP) {
+@@ -349,7 +349,7 @@ public:
+ 
+                     assert((i < MAX_ACTIVE_FD_NUM) &&
+                            "maximum number of active connection to the single TCP addr:port");
+-                    assert(m_max_events < MAX_FDS_NUM);
++                    assert(m_max_events < max_fds_num);
+                 }
+             }
+         }
+@@ -364,7 +364,7 @@ public:
+     }
+     //------------------------------------------------------------------------------
+     inline int analyzeArrival(int ifd) const {
+-        assert((ifd < MAX_FDS_NUM) && "exceeded tool limitation (MAX_FDS_NUM)");
++        assert((ifd < max_fds_num) && "exceeded tool limitation (max_fds_num)");
+ 
+         return mp_epoll_events[ifd].data.fd;
+     }
+@@ -419,7 +419,7 @@ public:
+ 
+                     assert((i < MAX_ACTIVE_FD_NUM) &&
+                            "maximum number of active connection to the single TCP addr:port");
+-                    assert(m_max_events < MAX_FDS_NUM);
++                    assert(m_max_events < max_fds_num);
+                 }
+             }
+         }
+@@ -436,7 +436,7 @@ public:
+     }
+     //------------------------------------------------------------------------------
+     inline int analyzeArrival(int ifd) const {
+-        assert((ifd < MAX_FDS_NUM) && "exceeded tool limitation (MAX_FDS_NUM)");
++        assert((ifd < max_fds_num) && "exceeded tool limitation (max_fds_num)");
+ 
+         return mp_kqueue_events[ifd].ident;
+     }
+@@ -524,7 +524,7 @@ public:
+     }
+     //------------------------------------------------------------------------------
+     inline int analyzeArrival(int ifd) {
+-        assert((ifd < MAX_FDS_NUM) && "exceeded tool limitation (MAX_FDS_NUM)");
++        assert((ifd < max_fds_num) && "exceeded tool limitation (max_fds_num)");
+         int ring_fd = 0;
+         g_vma_buff = NULL;
+         if (!m_current_vma_ring_comp) {
+diff --git a/src/os_abstract.cpp b/src/os_abstract.cpp
+index 19f3381..2b6816e 100644
+--- a/src/os_abstract.cpp
++++ b/src/os_abstract.cpp
+@@ -393,7 +393,7 @@ int os_set_affinity(const os_thread_t &thread, const os_cpuset_t &_mycpuset) {
+     return 0;
+ }
+ 
+-int os_get_max_active_fds_num() {
++int os_get_max_fds_num() {
+ #ifdef __windows__
+     return MAX_OPEN_FILES;
+ #else
+@@ -402,11 +402,12 @@ int os_get_max_active_fds_num() {
+         struct rlimit curr_limits;
+         if (getrlimit(RLIMIT_NOFILE, &curr_limits) == -1) {
+             perror("getrlimit");
+-            return 1024; // try the common default
+-        }
+-        max_active_fd_num = (int)curr_limits.rlim_max;
+-        if (max_active_fd_num == -1) {
+             max_active_fd_num = 1024; // try the common default
++        } else {
++            max_active_fd_num = (int)curr_limits.rlim_max;
++            if (max_active_fd_num == -1) {
++                max_active_fd_num = 1024; // try the common default
++            }
+         }
+     }
+     return max_active_fd_num;
+diff --git a/src/os_abstract.h b/src/os_abstract.h
+index cdec178..5121770 100644
+--- a/src/os_abstract.h
++++ b/src/os_abstract.h
+@@ -207,7 +207,7 @@ int os_set_nonblocking_socket(int fd);
+ int os_daemonize();
+ int os_set_duration_timer(const itimerval &timer, sig_handler handler);
+ void os_set_disarm_timer(const itimerval& timer);
+-int os_get_max_active_fds_num();
++int os_get_max_fds_num();
+ bool os_sock_startup();
+ bool os_sock_cleanup();
+ const char* os_get_error(int res);
+diff --git a/src/server.cpp b/src/server.cpp
+index 8bc377a..dd6a439 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -292,12 +292,12 @@ int Server<IoType, SwitchActivityInfo, SwitchCalcGaps>::server_accept(int ifd) {
+             if (tmp->active_fd_list) {
+                 FREE(tmp->active_fd_list);
+             }
+-            log_dbg("Can`t accept connection\n");
++            log_dbg("Can`t accept connection");
+         } else {
+             /* Check if it is exceeded internal limitations
+-             * MAX_FDS_NUM and MAX_ACTIVE_FD_NUM
++             * max_fds_num and MAX_ACTIVE_FD_NUM
+              */
+-            if ((active_ifd < MAX_FDS_NUM) &&
++            if ((active_ifd < max_fds_num) &&
+                 (g_fds_array[ifd]->active_fd_count < (MAX_ACTIVE_FD_NUM - 1))) {
+                 if (prepare_socket(active_ifd, tmp.get()) !=
+                     (int)INVALID_SOCKET) { // TODO: use SOCKET all over the way and avoid this cast
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 16b2c73..db78367 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -2470,6 +2470,8 @@ static void set_select_timeout(int time_out_msec) {
+ 
+ //------------------------------------------------------------------------------
+ void set_defaults() {
++    max_fds_num = os_get_max_fds_num();
++
+ #if !defined(__windows__) && !defined(__FreeBSD__) && !defined(__APPLE__)
+     bool success = vma_xlio_try_set_func_pointers();
+     if (!success) {
+@@ -2487,7 +2489,7 @@ void set_defaults() {
+         sock_lib_started = 1;
+     }
+ #endif
+-    g_fds_array = (fds_data **)MALLOC(MAX_FDS_NUM * sizeof(fds_data *));
++    g_fds_array = (fds_data **)MALLOC(max_fds_num * sizeof(fds_data *));
+     if (!g_fds_array) {
+         log_err("Failed to allocate memory for global pointer fds_array");
+         exit_with_log(SOCKPERF_ERR_NO_MEMORY);
+@@ -2495,7 +2497,7 @@ void set_defaults() {
+     int igmp_max_memberships = read_int_from_sys_file("/proc/sys/net/ipv4/igmp_max_memberships");
+     if (igmp_max_memberships != -1) IGMP_MAX_MEMBERSHIPS = igmp_max_memberships;
+ 
+-    memset(g_fds_array, 0, sizeof(fds_data *) * MAX_FDS_NUM);
++    memset(g_fds_array, 0, sizeof(fds_data *) * max_fds_num);
+     s_user_params.rx_mc_if_ix = 0;
+     s_user_params.tx_mc_if_ix = 0;
+     s_user_params.rx_mc_if_ix_specified = false;
+@@ -3341,7 +3343,7 @@ static int set_sockets_from_feedfile(const char *feedfile_name) {
+                 s_fd_num++;
+             }
+             if (curr_fd >= 0) {
+-                if ((curr_fd >= MAX_FDS_NUM) ||
++                if ((curr_fd >= max_fds_num) ||
+                     (prepare_socket(curr_fd, tmp.get()) == (int)
+                      INVALID_SOCKET)) { // TODO: use SOCKET all over the way and avoid this cast
+                     log_err("Invalid socket");
+@@ -3597,7 +3599,7 @@ int bringup(const int *p_daemonize) {
+                     log_err("socket(AF_INET4/6/AF_UNIX, SOCK_x)");
+                     rc = SOCKPERF_ERR_SOCKET;
+                 } else {
+-                    if ((curr_fd >= MAX_FDS_NUM) ||
++                    if ((curr_fd >= max_fds_num) ||
+                         (prepare_socket(curr_fd, tmp.get()) ==
+                         (int)INVALID_SOCKET)) { // TODO: use SOCKET all over the way and avoid
+                                                 // this cast
+diff --git a/src/tls.cpp b/src/tls.cpp
+index 9245df9..1ec3514 100644
+--- a/src/tls.cpp
++++ b/src/tls.cpp
+@@ -135,7 +135,7 @@ error_ctx_not_allocated:
+ 
+ void tls_exit(void) {
+     if (g_fds_array) {
+-        for (int ifd = 0; ifd < MAX_FDS_NUM; ifd++) {
++        for (int ifd = 0; ifd < max_fds_num; ifd++) {
+             if (g_fds_array[ifd]) {
+                 SSL_free((SSL *)g_fds_array[ifd]->tls_handle);
+             }
+-- 
+2.43.0
+

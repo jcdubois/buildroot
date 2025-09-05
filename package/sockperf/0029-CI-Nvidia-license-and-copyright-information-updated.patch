@@ -1,0 +1,484 @@
+From 91b10ca095ea2efe6aaab830e34c2afe2c3e4cbf Mon Sep 17 00:00:00 2001
+From: Viacheslav Login <vlogin@nvidia.com>
+Date: Thu, 26 Sep 2024 09:40:21 +0300
+Subject: [PATCH 29/33] [CI] Nvidia license and copyright information updated
+
+It was found that some files contained outdated licenses and copyright information.
+This information in the file headers was updated using the NGCI v5.0.3-82 Header Check utility.
+
+Issue: HPCINFRA-2612
+Signed-off-by: Viacheslav Login <vlogin@nvidia.com>
+---
+ src/aopt.cpp                         | 1 +
+ src/aopt.h                           | 1 +
+ src/client.cpp                       | 1 +
+ src/client.h                         | 1 +
+ src/clock.h                          | 1 +
+ src/common.cpp                       | 1 +
+ src/common.h                         | 1 +
+ src/defs.cpp                         | 1 +
+ src/defs.h                           | 1 +
+ src/input_handlers.h                 | 1 +
+ src/iohandlers.cpp                   | 1 +
+ src/iohandlers.h                     | 1 +
+ src/ip_address.cpp                   | 1 +
+ src/ip_address.h                     | 1 +
+ src/message.cpp                      | 1 +
+ src/message.h                        | 1 +
+ src/message_parser.h                 | 1 +
+ src/os_abstract.cpp                  | 1 +
+ src/os_abstract.h                    | 1 +
+ src/packet.cpp                       | 1 +
+ src/packet.h                         | 1 +
+ src/playback.cpp                     | 1 +
+ src/playback.h                       | 1 +
+ src/port_descriptor.h                | 1 +
+ src/server.cpp                       | 1 +
+ src/server.h                         | 1 +
+ src/sockperf.cpp                     | 1 +
+ src/switches.h                       | 1 +
+ src/ticks.cpp                        | 1 +
+ src/ticks.h                          | 1 +
+ src/ticks_os.h                       | 1 +
+ src/tls.cpp                          | 1 +
+ src/tls.h                            | 1 +
+ src/vma-xlio-redirect.cpp            | 1 +
+ src/vma-xlio-redirect.h              | 1 +
+ tests/avner-master-test.sh           | 1 +
+ tests/avner-test.sh                  | 1 +
+ tests/gtest/main.cpp                 | 1 +
+ tests/gtest/message_parser_tests.cpp | 1 +
+ tests/verifier/verifier.pl           | 1 +
+ tests/vma_multiplexers_test.sh       | 1 +
+ tests/vma_perf_envelope.sh           | 1 +
+ 42 files changed, 42 insertions(+)
+
+diff --git a/src/aopt.cpp b/src/aopt.cpp
+index ad762ce..d7dba82 100644
+--- a/src/aopt.cpp
++++ b/src/aopt.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/aopt.h b/src/aopt.h
+index 33ecab4..ff294fd 100644
+--- a/src/aopt.h
++++ b/src/aopt.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/client.cpp b/src/client.cpp
+index 081f2c4..eb6e828 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/client.h b/src/client.h
+index e78627d..7938ec8 100644
+--- a/src/client.h
++++ b/src/client.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/clock.h b/src/clock.h
+index 882f249..db9424b 100644
+--- a/src/clock.h
++++ b/src/clock.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/common.cpp b/src/common.cpp
+index e12dd7f..5df6e2c 100644
+--- a/src/common.cpp
++++ b/src/common.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/common.h b/src/common.h
+index 446da17..31a6609 100644
+--- a/src/common.h
++++ b/src/common.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/defs.cpp b/src/defs.cpp
+index 1a00f00..51d5259 100644
+--- a/src/defs.cpp
++++ b/src/defs.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/defs.h b/src/defs.h
+index 24e4bf4..2d80a95 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/input_handlers.h b/src/input_handlers.h
+index 1528df7..11f445f 100644
+--- a/src/input_handlers.h
++++ b/src/input_handlers.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/iohandlers.cpp b/src/iohandlers.cpp
+index ec45ee8..bc54d31 100644
+--- a/src/iohandlers.cpp
++++ b/src/iohandlers.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 1d105c3..9032296 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/ip_address.cpp b/src/ip_address.cpp
+index e243553..e34e5cb 100644
+--- a/src/ip_address.cpp
++++ b/src/ip_address.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/ip_address.h b/src/ip_address.h
+index 125afaf..e9127c3 100644
+--- a/src/ip_address.h
++++ b/src/ip_address.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/message.cpp b/src/message.cpp
+index 097d088..9fb11b1 100644
+--- a/src/message.cpp
++++ b/src/message.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/message.h b/src/message.h
+index 4dc83ab..090334d 100644
+--- a/src/message.h
++++ b/src/message.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/message_parser.h b/src/message_parser.h
+index d38f291..eb3dbb0 100644
+--- a/src/message_parser.h
++++ b/src/message_parser.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/os_abstract.cpp b/src/os_abstract.cpp
+index 634da54..213f8a8 100644
+--- a/src/os_abstract.cpp
++++ b/src/os_abstract.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/os_abstract.h b/src/os_abstract.h
+index 6aa62f9..57be534 100644
+--- a/src/os_abstract.h
++++ b/src/os_abstract.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/packet.cpp b/src/packet.cpp
+index b5758d3..8bff097 100644
+--- a/src/packet.cpp
++++ b/src/packet.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/packet.h b/src/packet.h
+index d954733..9ac43c7 100644
+--- a/src/packet.h
++++ b/src/packet.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/playback.cpp b/src/playback.cpp
+index 598fe8d..e23f332 100644
+--- a/src/playback.cpp
++++ b/src/playback.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/playback.h b/src/playback.h
+index d30f4c9..e4fc9ab 100644
+--- a/src/playback.h
++++ b/src/playback.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/port_descriptor.h b/src/port_descriptor.h
+index 9284438..415deaa 100644
+--- a/src/port_descriptor.h
++++ b/src/port_descriptor.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/server.cpp b/src/server.cpp
+index 60aa86d..2d2ecce 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/server.h b/src/server.h
+index 9f45075..83770f2 100644
+--- a/src/server.h
++++ b/src/server.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 9da06d4..d84b035 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/switches.h b/src/switches.h
+index f9568fb..83a920b 100644
+--- a/src/switches.h
++++ b/src/switches.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/ticks.cpp b/src/ticks.cpp
+index 56f53d8..c56e0b6 100644
+--- a/src/ticks.cpp
++++ b/src/ticks.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/ticks.h b/src/ticks.h
+index 1f2b334..679f3d9 100644
+--- a/src/ticks.h
++++ b/src/ticks.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/ticks_os.h b/src/ticks_os.h
+index 6a223a5..46e313c 100644
+--- a/src/ticks_os.h
++++ b/src/ticks_os.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/tls.cpp b/src/tls.cpp
+index 4439353..5b79796 100644
+--- a/src/tls.cpp
++++ b/src/tls.cpp
+@@ -1,5 +1,6 @@
+ /*
+  *
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/tls.h b/src/tls.h
+index 7ffb386..d6bbdc3 100644
+--- a/src/tls.h
++++ b/src/tls.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/vma-xlio-redirect.cpp b/src/vma-xlio-redirect.cpp
+index c996b9e..5554d4a 100644
+--- a/src/vma-xlio-redirect.cpp
++++ b/src/vma-xlio-redirect.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/src/vma-xlio-redirect.h b/src/vma-xlio-redirect.h
+index a8579bf..636c058 100644
+--- a/src/vma-xlio-redirect.h
++++ b/src/vma-xlio-redirect.h
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/tests/avner-master-test.sh b/tests/avner-master-test.sh
+index 1312421..de9ce7c 100755
+--- a/tests/avner-master-test.sh
++++ b/tests/avner-master-test.sh
+@@ -1,5 +1,6 @@
+ #!/bin/bash
+ #
++# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ # Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+diff --git a/tests/avner-test.sh b/tests/avner-test.sh
+index a6e70e9..53a220d 100755
+--- a/tests/avner-test.sh
++++ b/tests/avner-test.sh
+@@ -1,5 +1,6 @@
+ #!/bin/bash
+ #
++# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ # Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+diff --git a/tests/gtest/main.cpp b/tests/gtest/main.cpp
+index ff29ddb..ff08206 100644
+--- a/tests/gtest/main.cpp
++++ b/tests/gtest/main.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/tests/gtest/message_parser_tests.cpp b/tests/gtest/message_parser_tests.cpp
+index d4f0437..15c6a0a 100644
+--- a/tests/gtest/message_parser_tests.cpp
++++ b/tests/gtest/message_parser_tests.cpp
+@@ -1,4 +1,5 @@
+ /*
++ * SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+  * Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  * All rights reserved.
+  *
+diff --git a/tests/verifier/verifier.pl b/tests/verifier/verifier.pl
+index d29cfef..2a11c03 100755
+--- a/tests/verifier/verifier.pl
++++ b/tests/verifier/verifier.pl
+@@ -1,5 +1,6 @@
+ #!/usr/bin/env perl
+ #
++# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ # Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+diff --git a/tests/vma_multiplexers_test.sh b/tests/vma_multiplexers_test.sh
+index e2af3de..78798e7 100755
+--- a/tests/vma_multiplexers_test.sh
++++ b/tests/vma_multiplexers_test.sh
+@@ -1,5 +1,6 @@
+ #!/bin/bash
+ 
++# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ # Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+diff --git a/tests/vma_perf_envelope.sh b/tests/vma_perf_envelope.sh
+index 5c3451e..44b7c92 100755
+--- a/tests/vma_perf_envelope.sh
++++ b/tests/vma_perf_envelope.sh
+@@ -1,5 +1,6 @@
+ #!/bin/bash
+ 
++# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+ # Copyright (c) 2011-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ # All rights reserved.
+ #
+-- 
+2.43.0
+

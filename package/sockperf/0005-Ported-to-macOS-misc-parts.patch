@@ -1,0 +1,284 @@
+From 5f7fbb0eeb91e88e429db1044ee4c205b7231b57 Mon Sep 17 00:00:00 2001
+From: Wonsup Yoon <pusnow@kaist.ac.kr>
+Date: Fri, 20 Jan 2023 23:21:46 +0900
+Subject: [PATCH 05/33] Ported to macOS (misc parts)
+
+---
+ src/client.cpp          |  4 ++--
+ src/defs.h              |  7 ++++---
+ src/iohandlers.cpp      |  2 +-
+ src/iohandlers.h        |  2 +-
+ src/ip_address.h        |  9 ++-------
+ src/message.cpp         |  2 +-
+ src/os_abstract.cpp     |  6 ++----
+ src/server.cpp          |  2 +-
+ src/sockperf.cpp        | 18 +++++++++---------
+ src/vma-xlio-redirect.h |  6 ++----
+ 10 files changed, 25 insertions(+), 33 deletions(-)
+
+diff --git a/src/client.cpp b/src/client.cpp
+index bc57eb2..765a3bd 100644
+--- a/src/client.cpp
++++ b/src/client.cpp
+@@ -885,7 +885,7 @@ int Client<IoType, SwitchDataIntegrity, SwitchActivityInfo, SwitchCycleDuration,
+ #if defined(__linux__) || defined(__APPLE__)
+                 struct sockaddr_store_t unix_addr;
+                 socklen_t unix_addr_len;
+-#endif
++#endif // defined(__linux__) || defined(__APPLE__)
+                 if (p_client_bind_addr->addr.sa_family == AF_UNIX && g_pApp->m_const_params.sock_type == SOCK_DGRAM) { // Need to bind localy
+ #ifdef __windows__
+                     log_err("AF_UNIX with DGRAM isn't supported in windows");
+@@ -1271,7 +1271,7 @@ void client_handler(handler_info *p_info) {
+             client_handler<IoEpoll>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+             break;
+         }
+-#endif // !__FreeBSD__
++#endif // !__FreeBSD__ && !defined(__APPLE__)
+ #ifdef USING_VMA_EXTRA_API // For VMA socketxtreme Only
+         case SOCKETXTREME: {
+             client_handler<IoSocketxtreme>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+diff --git a/src/defs.h b/src/defs.h
+index fee7180..dd0276c 100644
+--- a/src/defs.h
++++ b/src/defs.h
+@@ -64,6 +64,7 @@ typedef unsigned short int sa_family_t;
+ #include <unistd.h>   /* getopt() and sleep()*/
+ #include <poll.h>
+ #include <pthread.h>
++#include <sys/ioctl.h>  /* ioctl, struct winsize */
+ #include <sys/time.h>   /* timers*/
+ #include <sys/socket.h> /* sockets*/
+ #include <sys/select.h> /* select() According to POSIX 1003.1-2001 */
+@@ -96,7 +97,7 @@ typedef unsigned short int sa_family_t;
+ #include "playback.h"
+ #include "ip_address.h"
+ 
+-#if !defined(__windows__) && !defined(__FreeBSD__)
++#if !defined(__windows__) && !defined(__FreeBSD__) && !defined(__APPLE__)
+ #include "vma-xlio-redirect.h"
+ #ifdef USING_VMA_EXTRA_API // VMA
+ #define RING_LOGIC_PER_INTERFACE VMA_RING_LOGIC_PER_INTERFACE
+@@ -140,7 +141,7 @@ typedef unsigned short int sa_family_t;
+ #undef RING_LOGIC_LAST
+ #undef ring_logic_t
+ #endif // USING_XLIO_EXTRA_API
+-#endif // !WIN32 && !__FreeBSD__
++#endif // !defined(__windows__) && !defined(__FreeBSD__) && !defined(__APPLE__)
+ 
+ #define MIN_PAYLOAD_SIZE (MsgHeader::EFFECTIVE_SIZE)
+ extern int MAX_PAYLOAD_SIZE;
+@@ -201,7 +202,7 @@ const uint32_t TEST_FIRST_CONNECTION_FIRST_PACKET_TTL_THRESHOLD_MSEC = 50;
+         "^[UuTt]:(/.+)[\r\n]"
+ #define RESOLVE_ADDR_FORMAT_SOCKET                                                                 \
+         "/.+"
+-#endif
++#endif // defined(__linux__) || defined(__APPLE__) 
+ 
+ #define PRINT_PROTOCOL(type)                                                                       \
+     ((type) == SOCK_DGRAM ? "UDP" : ((type) == SOCK_STREAM ? "TCP" : "<?>"))
+diff --git a/src/iohandlers.cpp b/src/iohandlers.cpp
+index 57e9a57..cf10dcb 100644
+--- a/src/iohandlers.cpp
++++ b/src/iohandlers.cpp
+@@ -250,7 +250,7 @@ int IoEpoll::prepareNetwork() {
+ 
+     return rc;
+ }
+-#endif
++#endif // !defined(__FreeBSD__) && !defined(__APPLE__)
+ #ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+ //==============================================================================
+ //------------------------------------------------------------------------------
+diff --git a/src/iohandlers.h b/src/iohandlers.h
+index 592887c..ce94e86 100644
+--- a/src/iohandlers.h
++++ b/src/iohandlers.h
+@@ -377,7 +377,7 @@ private:
+     int m_epfd;
+     int m_max_events;
+ };
+-#endif
++#endif // !defined(__FreeBSD__) && !defined(__APPLE__) 
+ 
+ #ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+ //==============================================================================
+diff --git a/src/ip_address.h b/src/ip_address.h
+index 36a2e5d..99b2a58 100644
+--- a/src/ip_address.h
++++ b/src/ip_address.h
+@@ -38,17 +38,12 @@
+ #include <afunix.h>
+ typedef unsigned short int sa_family_t;
+ 
+-#elif __APPLE__
++#elif defined(__linux__) || defined(__APPLE__) 
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <sys/un.h>      /* definitions for UNIX domain sockets */
+ 
+-#elif __linux__
+-#include <sys/socket.h>
+-#include <netinet/in.h>
+-#include <sys/un.h>      /* definitions for UNIX domain sockets */
+-
+-#endif
++#endif // defined(__linux__) || defined(__APPLE__)
+ 
+ #include "os_abstract.h"
+ #include <functional>
+diff --git a/src/message.cpp b/src/message.cpp
+index a44d86b..99bd712 100644
+--- a/src/message.cpp
++++ b/src/message.cpp
+@@ -30,7 +30,7 @@
+ 
+ #if !defined(__FreeBSD__) && !defined(__APPLE__)
+ #include <malloc.h>
+-#endif
++#endif // !defined(__FreeBSD__) && !defined(__APPLE__)
+ 
+ #include <string>
+ #include "common.h"
+diff --git a/src/os_abstract.cpp b/src/os_abstract.cpp
+index 1e4bd01..19f3381 100644
+--- a/src/os_abstract.cpp
++++ b/src/os_abstract.cpp
+@@ -132,9 +132,7 @@ os_thread_t os_getthread(void) {
+ #ifdef __windows__
+     mythread.tid = GetCurrentThreadId();
+     mythread.hThread = GetCurrentThread();
+-#elif __FreeBSD__
+-    mythread.tid = pthread_self();
+-#elif __APPLE__
++#elif defined(__FreeBSD__) || defined(__APPLE__) 
+     mythread.tid = pthread_self();
+ #else
+     mythread.tid = syscall(__NR_gettid);
+@@ -407,7 +405,7 @@ int os_get_max_active_fds_num() {
+             return 1024; // try the common default
+         }
+         max_active_fd_num = (int)curr_limits.rlim_max;
+-        if (max_active_fd_num == -1){
++        if (max_active_fd_num == -1) {
+             max_active_fd_num = 1024; // try the common default
+         }
+     }
+diff --git a/src/server.cpp b/src/server.cpp
+index 0991d7d..ec803a4 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -421,7 +421,7 @@ void server_handler(handler_info *p_info) {
+             server_handler<IoEpoll>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+             break;
+         }
+-#endif
++#endif // !defined(__FreeBSD__) && !defined(__APPLE__)
+ #ifdef USING_VMA_EXTRA_API // VMA socketxtreme-extra-api Only
+         case SOCKETXTREME: {
+             server_handler<IoSocketxtreme>(p_info->fd_min, p_info->fd_max, p_info->fd_num);
+diff --git a/src/sockperf.cpp b/src/sockperf.cpp
+index 1fd8dd8..71c9e2c 100644
+--- a/src/sockperf.cpp
++++ b/src/sockperf.cpp
+@@ -78,7 +78,7 @@
+ 
+ #if !defined(__APPLE__) && (defined(__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9)))
+ #   define NEED_REGEX_WORKAROUND
+-#endif
++#endif //  !defined(__APPLE__) && (defined(__GNUC__) && (__GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 9)))
+ 
+ #define __STDC_LIMIT_MACROS // for UINT32_MAX in C++
+ #include <stdint.h>
+@@ -190,7 +190,7 @@ static const AOPT_DESC common_opt_desc[] = {
+       aopt_set_string("iomux-type"),
+ #ifdef __windows__
+       "Type of multiple file descriptors handle [s|select|r|recvfrom](default select)."
+-#elif __FreeBSD__
++#elif defined(__FreeBSD__) || defined(__APPLE__)
+       "Type of multiple file descriptors handle [s|select|p|poll|r|recvfrom](default select)."
+ #else
+       "Type of multiple file descriptors handle "
+@@ -203,7 +203,7 @@ static const AOPT_DESC common_opt_desc[] = {
+       aopt_set_string("timeout"),
+ #ifdef __windows__
+       "Set select timeout to <msec>, -1 for infinite (default is 10 msec)."
+-#elif __FreeBSD__
++#elif defined(__FreeBSD__) || defined(__APPLE__)
+       "Set select/poll timeout to <msec>, -1 for infinite (default is 10 msec)."
+ #else
+       "Set select/poll/epoll timeout to <msec>, -1 for infinite (default is 10 msec)."
+@@ -1819,7 +1819,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                 if (optarg) {
+                     strncpy(feedfile_name, optarg, MAX_ARGV_SIZE);
+                     feedfile_name[MAX_PATH_LENGTH - 1] = '\0';
+-#if defined(__windows__) || defined(__FreeBSD__)
++#if defined(__windows__) || defined(__FreeBSD__) || defined(__APPLE__)
+                     s_user_params.fd_handler_type = SELECT;
+ #else
+                     s_user_params.fd_handler_type = EPOLL;
+@@ -1843,7 +1843,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                     strncpy(fd_handle_type, optarg, MAX_ARGV_SIZE);
+                     fd_handle_type[MAX_ARGV_SIZE - 1] = '\0';
+ #ifndef __windows__
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__)
+                     if (!strcmp(fd_handle_type, "epoll") || !strcmp(fd_handle_type, "e")) {
+                         s_user_params.fd_handler_type = EPOLL;
+                     } else
+@@ -1965,7 +1965,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                 if (errno != 0 || value < -1) {
+ #ifdef __windows__
+                     log_msg("'-%d' Invalid select timeout val: %s", OPT_SELECT_TIMEOUT, optarg);
+-#elif __FreeBSD__
++#elif defined(__FreeBSD__) || defined(__APPLE__)
+                     log_msg("'-%d' Invalid select/poll timeout val: %s", OPT_SELECT_TIMEOUT,
+                             optarg);
+ #else
+@@ -2134,7 +2134,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+             }
+         }
+ 
+-#ifndef __FreeBSD__
++#if !defined(__FreeBSD__) && !defined(__APPLE__)
+         if (!rc && aopt_check(common_obj, OPT_LOAD_VMA)) {
+             const char *optarg = aopt_value(common_obj, OPT_LOAD_VMA);
+             if (!optarg || !*optarg) optarg = (char *)"libvma.so"; // default value
+@@ -2159,7 +2159,7 @@ static int parse_common_opt(const AOPT_OBJECT *common_obj) {
+                 rc = SOCKPERF_ERR_BAD_ARGUMENT;
+             }
+         }
+-#endif // !defined(__FreeBSD__)
++#endif // !defined(__FreeBSD__) && !defined(__APPLE__)
+ #endif // !defined(__windows__)
+ 
+         if (!rc && aopt_check(common_obj, OPT_TCP)) {
+@@ -2463,7 +2463,7 @@ static void set_select_timeout(int time_out_msec) {
+ 
+ //------------------------------------------------------------------------------
+ void set_defaults() {
+-#if !defined(__windows__) && !defined(__FreeBSD__)
++#if !defined(__windows__) && !defined(__FreeBSD__) && !defined(__APPLE__)
+     bool success = vma_xlio_try_set_func_pointers();
+     if (!success) {
+         log_dbg("Failed to set function pointers for system functions.");
+diff --git a/src/vma-xlio-redirect.h b/src/vma-xlio-redirect.h
+index e09ba7e..e0277c1 100644
+--- a/src/vma-xlio-redirect.h
++++ b/src/vma-xlio-redirect.h
+@@ -37,10 +37,8 @@
+ #include <sched.h>
+ #include <sys/ioctl.h>
+ 
+-#ifdef __FreeBSD__
+-#include <netinet/in.h>
+-#include <stdio.h>
+-#elif __APPLE__
++
++#if defined(__FreeBSD__) || defined(__APPLE__) 
+ #include <netinet/in.h>
+ #include <stdio.h>
+ #else
+-- 
+2.43.0
+
