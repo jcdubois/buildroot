@@ -1,0 +1,32 @@
+From b6364562609bf6737b6da846709c124f6ece00cb Mon Sep 17 00:00:00 2001
+From: Jean-Christophe Dubois <jcd@tribudubois.net>
+Date: Mon, 8 Sep 2025 17:04:59 +0200
+Subject: [PATCH] Add nanopi R1 defconfig
+
+Signed-off-by: Jean-Christophe Dubois <jcd@tribudubois.net>
+---
+ configs/nanopi_r1_defconfig | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 configs/nanopi_r1_defconfig
+
+diff --git a/configs/nanopi_r1_defconfig b/configs/nanopi_r1_defconfig
+new file mode 100644
+index 00000000000..9966750c981
+--- /dev/null
++++ b/configs/nanopi_r1_defconfig
+@@ -0,0 +1,12 @@
++CONFIG_ARM=y
++CONFIG_ARCH_SUNXI=y
++CONFIG_DEFAULT_DEVICE_TREE="sun8i-h3-nanopi-r1"
++CONFIG_SPL=y
++CONFIG_MACH_SUN8I_H3=y
++CONFIG_DRAM_CLK=408
++# CONFIG_VIDEO_DE2 is not set
++# CONFIG_SYS_MALLOC_CLEAR_ON_INIT is not set
++CONFIG_CONSOLE_MUX=y
++CONFIG_SUN8I_EMAC=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
+-- 
+2.43.0
+
