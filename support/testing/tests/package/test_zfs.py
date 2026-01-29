@@ -57,7 +57,7 @@ class TestZfsBase(infra.basetest.BRTest):
             "sha256sum -c /tmp/urandom.sha256",
             "zpool status -v",
             # Check PyZFS
-            "arc_summary",
+            "zarcsummary",
         ]
         for cmd in cmds:
             self.assertRunOk(cmd, timeout=self.timeout)
@@ -81,7 +81,7 @@ class TestZfsUclibc(TestZfsBase):
     config = config.replace('BR2_TOOLCHAIN_EXTERNAL_BOOTLIN=y\n', '') + \
         """
         BR2_TOOLCHAIN_BUILDROOT_UCLIBC=y
-        BR2_KERNEL_HEADERS_5_4=y
+        BR2_KERNEL_HEADERS_5_10=y
         BR2_TOOLCHAIN_BUILDROOT_LOCALE=y
         BR2_PTHREAD_DEBUG=y
         BR2_TOOLCHAIN_BUILDROOT_CXX=y

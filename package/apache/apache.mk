@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-APACHE_VERSION = 2.4.65
+APACHE_VERSION = 2.4.66
 APACHE_SOURCE = httpd-$(APACHE_VERSION).tar.bz2
 APACHE_SITE = https://archive.apache.org/dist/httpd
 APACHE_LICENSE = Apache-2.0
@@ -89,6 +89,15 @@ APACHE_CONF_OPTS += \
 	--with-ssl=$(STAGING_DIR)/usr
 else
 APACHE_CONF_OPTS += --disable-ssl
+endif
+
+ifeq ($(BR2_PACKAGE_APACHE_MOD_MD),y)
+APACHE_CONF_OPTS += --enable-md
+# BR2_PACKAGE_APACHE_MOD_MD selects BR2_PACKAGE_OPENSSL, so openssl is
+# added above
+APACHE_DEPENDENCIES += jansson libcurl
+else
+APACHE_CONF_OPTS += --disable-md
 endif
 
 ifeq ($(BR2_PACKAGE_ZLIB),y)
